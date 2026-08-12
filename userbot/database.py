@@ -35,9 +35,19 @@ class Database:
                     min_fee TEXT DEFAULT '0.0',
                     tos_text TEXT,
                     group_naming_template TEXT DEFAULT 'MM • Deal #{deal_id}',
-                    owner_id INTEGER
+                    owner_id INTEGER,
+                    daily_group_id INTEGER,
+                    daily_group_date TEXT
                 )
             """)
+            
+            # Migration: check and add daily_group columns if they don't exist in older databases
+            cursor.execute("PRAGMA table_info(settings)")
+            columns = [col[1] for col in cursor.fetchall()]
+            if "daily_group_id" not in columns:
+                cursor.execute("ALTER TABLE settings ADD COLUMN daily_group_id INTEGER")
+            if "daily_group_date" not in columns:
+                cursor.execute("ALTER TABLE settings ADD COLUMN daily_group_date TEXT")
             
             # 2. deals table (not UNIQUE on chat_id to allow reuse of group chats for subsequent deals)
             cursor.execute("""

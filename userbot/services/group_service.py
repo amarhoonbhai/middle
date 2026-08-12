@@ -205,3 +205,46 @@ async def get_invite_link(client: TelegramClient, chat_entity: Any) -> Optional[
     except Exception as e:
         logger.error(f"Failed to export invite link: {e}")
         return None
+
+async def kick_user(client: TelegramClient, chat_entity: Any, user_str: Union[str, int]) -> None:
+    """Kicks/removes a user from a legacy group or supergroup/channel."""
+    try:
+        user_ent = await resolve_user_entity(client, user_str)
+        peer = await client.get_input_entity(chat_entity)
+        if isinstance(peer, types.InputPeerChannel):
+            from telethon.tl.functions.channels import EditBannedRequest
+            from telethon.tl.types import ChatBannedRights
+            # Banning with view_messages=True restricts their view and effectively kicks them from a megagroup
+            await call_with_retry(client, EditBannedRequest(
+                channel=peer,
+                participant=user_ent,
+                banned_rights=ChatBannedRights(
+                    until_date=None,
+                    view_messages=True
+                )
+            ))
+        elif isinstance(peer, types.InputPeerChat):
+            await call_with_retry(client, DeleteChatUserRequest(
+                chat_id=peer.chat_id,
+                user_id=user_ent
+            ))
+        else:
+            chat_id = utils.get_peer_id(chat_entity)
+            if str(chat_id).startswith("-100"):
+                from telethon.tl.functions.channels import EditBannedRequest
+                from telethon.tl.types import ChatBannedRights
+                await call_with_retry(client, EditBannedRequest(
+                    channel=chat_entity,
+                    participant=user_ent,
+                    banned_rights=ChatBannedRights(
+                        until_date=None,
+                        view_messages=True
+                    )
+                ))
+            else:
+                await call_with_retry(client, DeleteChatUserRequest(
+                    chat_id=abs(chat_id),
+                    user_id=user_ent
+                ))
+    except Exception as e:
+        logger.error(f"Failed to kick user {user_str} from chat {chat_entity}: {e}")
