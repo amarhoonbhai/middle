@@ -83,6 +83,7 @@ async def interactive_menu(db: Database) -> None:
                     commands=[
                         BotCommand(command="start", description="Welcome message & Quick Menu"),
                         BotCommand(command="help", description="Show all bot commands"),
+                        BotCommand(command="setgroup", description="Manually register current group as daily room"),
                         BotCommand(command="settings", description="View bot configurations"),
                         BotCommand(command="btc", description="Show BTC wallet address"),
                         BotCommand(command="eth", description="Show ETH wallet address"),
@@ -280,6 +281,7 @@ async def run_cli() -> None:
                 commands=[
                     BotCommand(command="start", description="Welcome message & Quick Menu"),
                     BotCommand(command="help", description="Show all bot commands"),
+                    BotCommand(command="setgroup", description="Manually register current group as daily room"),
                     BotCommand(command="settings", description="View bot configurations"),
                     BotCommand(command="btc", description="Show BTC wallet address"),
                     BotCommand(command="eth", description="Show ETH wallet address"),

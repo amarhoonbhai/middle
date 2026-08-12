@@ -15,6 +15,7 @@ def register_help_handlers(client: TelegramClient, db) -> None:
             "ℹ️ **Available Commands (Supports both / and . prefixes)**\n\n"
             "**MM Operations:**\n"
             "• `/mm @buyer @seller` - Register/setup daily deal room\n"
+            "• `/setgroup` - Manually set current group as today's active daily room\n"
             "• `/close` - Close current deal safely (requires confirmation)\n"
             "• `/name <name>` - Rename the MM group\n"
             "• `/fee <amount>` - Calculate middleman fee\n"

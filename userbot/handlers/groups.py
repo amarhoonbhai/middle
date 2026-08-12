@@ -206,25 +206,21 @@ def register_group_handlers(client: TelegramClient, db) -> None:
             chat_entity = await client.get_entity(target_chat_id)
         invite_link = await group_service.get_invite_link(client, chat_entity)
         
-        # Attempt to DM invite link to failed users
-        failed_notified = []
-        failed_unnotified = []
-        
-        if failed and invite_link:
-            for p_id in failed:
+        # Send DM containing invite link to both participants
+        dm_sent = []
+        dm_failed = []
+        if invite_link:
+            for p_id in parts:
                 try:
                     await client.send_message(
                         p_id,
                         f"🤝 **Hello! You have been invited to join Deal #{formatted_deal_id}** in our daily room.\n\n"
-                        f"Since your privacy settings prevented adding you automatically, "
-                        f"please click the link below to join today's deal room:\n{invite_link}"
+                        f"Please click the link below to join today's deal room:\n{invite_link}"
                     )
-                    failed_notified.append(p_id)
+                    dm_sent.append(p_id)
                 except Exception as dme:
                     logger.warning(f"Could not send DM invite link to {p_id}: {dme}")
-                    failed_unnotified.append(p_id)
-        else:
-            failed_unnotified = list(failed)
+                    dm_failed.append(p_id)
             
         # Welcome message inside the daily group chat
         welcome_text = (
@@ -233,10 +229,11 @@ def register_group_handlers(client: TelegramClient, db) -> None:
             "Both parties should confirm the agreed amount and transaction terms before payment.\n\n"
             f"• **Buyer/Seller Added**: {', '.join(added) if added else 'None'}\n"
         )
-        if failed_notified:
-            welcome_text += f"✉️ **Invite Link Sent via DM to**: {', '.join(failed_notified)} (due to group invite privacy settings)\n"
-        if failed_unnotified:
-            welcome_text += f"⚠️ **Failed to add/DM**: {', '.join(failed_unnotified)}\n"
+        if dm_sent:
+            welcome_text += f"✉️ **Invite Link Sent via DM to**: {', '.join(dm_sent)}\n"
+        if dm_failed or failed:
+            unadded_or_undelivered = list(set(dm_failed + failed))
+            welcome_text += f"⚠️ **Failed to add/DM**: {', '.join(unadded_or_undelivered)}\n"
             if invite_link:
                 welcome_text += f"🔗 **Manual Invite Link**: {invite_link}\n"
                 
@@ -365,3 +362,23 @@ def register_group_handlers(client: TelegramClient, db) -> None:
             
             if kicked_users:
                 await event.respond(f"🧹 **Cleaned up daily room**: Removed participants: {', '.join(kicked_users)}")
+
+    @client.on(events.NewMessage(pattern=r'^[./]setgroup$'))
+    @owner_command(db)
+    async def setgroup_command(event: events.NewMessage.Event) -> None:
+        """Manually registers the current group chat as today's active daily room."""
+        if not event.is_group:
+            await event.respond("❌ **Error**: This command must be executed inside a group chat.")
+            return
+            
+        chat_id = event.chat_id
+        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        
+        # Save daily group info in database settings
+        await db.update_settings(daily_group_id=chat_id, daily_group_date=today_str)
+        
+        await event.respond(
+            f"✅ **Success**: This group has been manually registered as today's active daily room!\n"
+            f"• **Date**: {today_str}\n"
+            f"• **Chat ID**: `{chat_id}`"
+        )
