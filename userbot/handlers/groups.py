@@ -67,7 +67,18 @@ def register_group_handlers(client: TelegramClient, db) -> None:
                 "Both parties should confirm the agreed amount and transaction terms before payment.\n\n"
                 f"• **Participants**: {', '.join(participants)}"
             )
-            await event.respond(welcome_text)
+            # Attach interactive buttons
+            from telethon import Button
+            welcome_buttons = [
+                [
+                    Button.inline("📜 Read TOS", data="btn_tos"),
+                    Button.inline("💰 Wallets", data="btn_crypto")
+                ],
+                [
+                    Button.inline("🏁 Close Deal", data="btn_close_deal")
+                ]
+            ]
+            await event.respond(welcome_text, buttons=welcome_buttons)
             
             # Pin TOS
             tos_text = settings.get("tos_text")
@@ -229,7 +240,18 @@ def register_group_handlers(client: TelegramClient, db) -> None:
             if invite_link:
                 welcome_text += f"🔗 **Manual Invite Link**: {invite_link}\n"
                 
-        await client.send_message(target_chat_id, welcome_text)
+        # Attach interactive buttons
+        from telethon import Button
+        welcome_buttons = [
+            [
+                Button.inline("📜 Read TOS", data="btn_tos"),
+                Button.inline("💰 Wallets", data="btn_crypto")
+            ],
+            [
+                Button.inline("🏁 Close Deal", data="btn_close_deal")
+            ]
+        ]
+        await client.send_message(target_chat_id, welcome_text, buttons=welcome_buttons)
         
         # Pin TOS
         tos_text = settings.get("tos_text")
