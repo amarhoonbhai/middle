@@ -50,23 +50,26 @@ def owner_command(db: Any) -> Callable:
                 except Exception as e:
                     logger.error(f"Failed to fetch logged-in user entity: {e}")
             
-            # Perform validation: prioritize active client account ID
-            if me_id is not None:
-                if event.sender_id != me_id:
-                    return
+            # Perform validation: accept command if sender is the bot account itself OR the configured owner_id
+            is_valid_owner = False
+            if me_id is not None and event.sender_id == me_id:
+                is_valid_owner = True
             else:
                 # Fallback to DB configuration check
-                if not await is_owner(event.sender_id, db):
-                    return
+                if await is_owner(event.sender_id, db):
+                    is_valid_owner = True
+            
+            if not is_valid_owner:
+                return
             
             try:
                 # Log execution start
-                logger.info(f"Owner executed command: {event.text} in chat {event.chat_id}")
+                logger.info(f"Owner ({event.sender_id}) executed command: {event.text} in chat {event.chat_id}")
                 
                 # Execute the handler
                 await func(event, *args, **kwargs)
                 
-                # Delete command if outgoing and configured
+                # Delete command if outgoing (sent by self) and configured
                 delete_commands = os.getenv("DELETE_COMMANDS", "True").lower() in ("true", "1", "yes")
                 if delete_commands and event.out:
                     try:
