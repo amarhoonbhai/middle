@@ -145,11 +145,10 @@ def register_group_handlers(client: TelegramClient, db) -> None:
         deal_id = await db.create_deal(target_chat_id, parts)
         formatted_deal_id = f"{deal_id:04d}"
         
-        # Try to invite participants (especially if reusing today's group, or if they failed during Megagroup fallback)
-        added = []
-        failed = []
-        
+        # Try to invite participants if reusing today's group
         if not new_group_created:
+            added = []
+            failed = []
             # Reusing existing group: try to add the participants into it
             from telethon.tl.functions.messages import AddChatUserRequest
             from telethon.tl.functions.channels import InviteToChannelRequest
