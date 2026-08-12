@@ -21,6 +21,11 @@ def register_group_handlers(client: TelegramClient, db) -> None:
         # 1. Hybrid check: If no arguments and executed in DMs, warn and return
         if not args and not event.is_group:
             await event.respond(
+                "❌ **Usage**: `.mm <user1> <user2>`\n"
+                "(Specify participants in private chat to create/reuse a daily group, or run `.mm` inside a group chat to activate it)"
+            )
+            return
+
         from telethon.tl import types
         from telethon.errors import UserPrivacyRestrictedError, RPCError
         import json
