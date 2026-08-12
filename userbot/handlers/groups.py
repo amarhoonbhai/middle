@@ -74,14 +74,41 @@ def register_group_handlers(client: TelegramClient, db) -> None:
         
         await db.update_deal(deal_id, chat_id=signed_chat_id, participants=str(added))
         
+        # Export group invite link
+        invite_link = await group_service.get_invite_link(client, chat_entity)
+        
+        # Attempt to send private message (DM) with invite link to failed participants
+        failed_notified = []
+        failed_unnotified = []
+        
+        if failed and invite_link:
+            for p_id in failed:
+                try:
+                    await client.send_message(
+                        p_id,
+                        f"🤝 **Hello! You have been invited to join Deal #{formatted_deal_id}** ({title}).\n\n"
+                        f"Since your privacy settings prevented adding you automatically, "
+                        f"please click the link below to join the group:\n{invite_link}"
+                    )
+                    failed_notified.append(p_id)
+                except Exception as dme:
+                    logger.warning(f"Could not send DM invite link to {p_id}: {dme}")
+                    failed_unnotified.append(p_id)
+        else:
+            failed_unnotified = list(failed)
+            
         welcome_text = (
             f"🤝 **Deal #{formatted_deal_id} created.**\n\n"
             "Please read the Terms of Service before proceeding.\n"
             "Both parties should confirm the agreed amount and transaction terms before payment.\n\n"
             f"• **Buyer/Seller Added**: {', '.join(added) if added else 'None'}\n"
         )
-        if failed:
-            welcome_text += f"⚠️ **Failed to add**: {', '.join(failed)} (likely due to their privacy settings)\n"
+        if failed_notified:
+            welcome_text += f"✉️ **Invite Link Sent via DM to**: {', '.join(failed_notified)} (due to group invite privacy settings)\n"
+        if failed_unnotified:
+            welcome_text += f"⚠️ **Failed to add/DM**: {', '.join(failed_unnotified)}\n"
+            if invite_link:
+                welcome_text += f"🔗 **Manual Invite Link**: {invite_link}\n"
             
         await client.send_message(signed_chat_id, welcome_text)
         

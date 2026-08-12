@@ -151,3 +151,28 @@ async def leave_group(client: TelegramClient, chat_entity: Any) -> None:
             await client(LeaveChannelRequest(channel=chat_entity))
         else:
             await client(DeleteChatUserRequest(chat_id=abs(chat_id), user_id='me'))
+
+async def get_invite_link(client: TelegramClient, chat_entity: Any) -> Optional[str]:
+    """Generates and returns an invite link for a legacy group or channel."""
+    from telethon.tl.functions.messages import ExportChatInviteRequest
+    try:
+        peer = await client.get_input_entity(chat_entity)
+        if isinstance(peer, types.InputPeerChat):
+            res = await client(ExportChatInviteRequest(chat_id=peer.chat_id))
+            return res.link
+        elif isinstance(peer, types.InputPeerChannel):
+            from telethon.tl.functions.channels import ExportInviteRequest
+            res = await client(ExportInviteRequest(channel=peer))
+            return res.link
+        else:
+            chat_id = utils.get_peer_id(chat_entity)
+            if str(chat_id).startswith("-100"):
+                from telethon.tl.functions.channels import ExportInviteRequest
+                res = await client(ExportInviteRequest(channel=chat_entity))
+            else:
+                res = await client(ExportChatInviteRequest(chat_id=abs(chat_id)))
+            return res.link
+    except Exception as e:
+        logger.error(f"Failed to export invite link: {e}")
+        return None
+
