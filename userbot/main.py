@@ -61,7 +61,13 @@ async def interactive_menu(db: Database) -> None:
             
             # Start login prompt if required
             await client.start()
-            print("✅ Userbot is active. Listening for commands on Telegram...")
+            
+            # Fetch logged in user and register as owner in database settings
+            me = await client.get_me()
+            await db.update_settings(owner_id=me.id)
+            print(f"✅ Userbot is active. Logged in as: {me.first_name} (ID: {me.id})")
+            print("Listening for commands on Telegram...")
+            
             await client.run_until_disconnected()
             break  # Exit menu if disconnected
             
@@ -231,7 +237,13 @@ async def run_cli() -> None:
         
         logger.info("Starting Telegram Client login flow...")
         await client.start()
-        logger.info("Userbot successfully authorized and running! Press Ctrl+C to stop.")
+        
+        # Fetch logged in user and register as owner in database settings
+        me = await client.get_me()
+        await db.update_settings(owner_id=me.id)
+        logger.info(f"✅ Userbot successfully authorized! Logged in as: {me.first_name} (ID: {me.id})")
+        logger.info("Running daemon... Press Ctrl+C to stop.")
+        
         await client.run_until_disconnected()
         
     elif args.command == "settings":
