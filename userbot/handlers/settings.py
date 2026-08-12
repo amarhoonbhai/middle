@@ -69,13 +69,13 @@ def register_settings_handlers(client: TelegramClient, db, is_userbot: bool = Fa
             await event.respond(f"✅ **Success**: Owner ID updated to `{new_owner_id}`.")
         return
 
-    @client.on(events.NewMessage(pattern=r'^[./]addaccount(?:\s+(.+))?$'))
+    @client.on(events.NewMessage(pattern=r'^\.addaccount(?:\s+(.+))?$'))
     @owner_command(db)
     async def addaccount_command(event: events.NewMessage.Event) -> None:
         """Starts the interactive authorization process to connect the owner's personal userbot account."""
         args = event.pattern_match.group(1)
         if not args:
-            await event.respond("❌ **Usage**: `/addaccount <phone_number>` (e.g., `/addaccount +1234567890`)")
+            await event.respond("❌ **Usage**: `.addaccount <phone_number>` (e.g., `.addaccount +1234567890`)")
             return
             
         phone = args.strip()
@@ -101,25 +101,26 @@ def register_settings_handlers(client: TelegramClient, db, is_userbot: bool = Fa
             
             await event.respond(
                 "📩 **Login code sent to Telegram!**\n\n"
-                "Please enter the login code you received using `/code <your_code>` (e.g., `/code 12345`)."
+                "Please enter the login code you received using `.code <your_code>` (e.g., `.code 12345` or `.code 1 3 4 5 3 4`)."
             )
         except Exception as e:
             await event.respond(f"❌ **Failed to initiate login**: {e}")
 
-    @client.on(events.NewMessage(pattern=r'^[./]code(?:\s+(.+))?$'))
+    @client.on(events.NewMessage(pattern=r'^\.code(?:\s+(.+))?$'))
     @owner_command(db)
     async def code_command(event: events.NewMessage.Event) -> None:
         """Handles the verification code entry for userbot authorization."""
         if not login_state["client"] or not login_state["phone"]:
-            await event.respond("❌ **Error**: No active login session found. Use `/addaccount <phone_number>` first.")
+            await event.respond("❌ **Error**: No active login session found. Use `.addaccount <phone_number>` first.")
             return
             
         args = event.pattern_match.group(1)
         if not args:
-            await event.respond("❌ **Usage**: `/code <verification_code>`")
+            await event.respond("❌ **Usage**: `.code <verification_code>`")
             return
             
-        code = args.strip()
+        # Clean OTP: Remove all space characters to support formats like '1 3 4 5 3'
+        code = args.strip().replace(" ", "")
         user_client = login_state["client"]
         phone = login_state["phone"]
         code_hash = login_state["phone_code_hash"]
@@ -143,22 +144,22 @@ def register_settings_handlers(client: TelegramClient, db, is_userbot: bool = Fa
             except SessionPasswordNeededError:
                 await event.respond(
                     "🔐 **Two-Factor Authentication (2FA) is enabled!**\n\n"
-                    "Please reply with your password using `/password <your_password>`."
+                    "Please reply with your password using `.password <your_password>`."
                 )
         except Exception as e:
             await event.respond(f"❌ **Sign-in failed**: {e}")
 
-    @client.on(events.NewMessage(pattern=r'^[./]password(?:\s+(.+))?$'))
+    @client.on(events.NewMessage(pattern=r'^\.password(?:\s+(.+))?$'))
     @owner_command(db)
     async def password_command(event: events.NewMessage.Event) -> None:
         """Handles the 2FA password entry for userbot authorization."""
         if not login_state["client"] or not login_state["phone"]:
-            await event.respond("❌ **Error**: No active login session found. Use `/addaccount <phone_number>` first.")
+            await event.respond("❌ **Error**: No active login session found. Use `.addaccount <phone_number>` first.")
             return
             
         args = event.pattern_match.group(1)
         if not args:
-            await event.respond("❌ **Usage**: `/password <2fa_password>`")
+            await event.respond("❌ **Usage**: `.password <2fa_password>`")
             return
             
         pwd = args.strip()
@@ -180,7 +181,7 @@ def register_settings_handlers(client: TelegramClient, db, is_userbot: bool = Fa
         except Exception as e:
             await event.respond(f"❌ **2FA verification failed**: {e}")
 
-    @client.on(events.NewMessage(pattern=r'^[./]userbot$'))
+    @client.on(events.NewMessage(pattern=r'^\.userbot$'))
     @owner_command(db)
     async def userbot_status_command(event: events.NewMessage.Event) -> None:
         """Displays the connection status of the owner's userbot account."""

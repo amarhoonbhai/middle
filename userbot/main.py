@@ -72,30 +72,18 @@ async def start_bot() -> None:
     except Exception as gde:
         logger.warning(f"Could not fetch bot dialogs on startup: {gde}")
     
-    # Register Bot commands in Telegram Menu
+    # Clear all Bot commands in Telegram Menu to disable slash command suggestions
     try:
         from telethon.tl.functions.bots import SetBotCommandsRequest
-        from telethon.tl.types import BotCommand, BotCommandScopeDefault
+        from telethon.tl.types import BotCommandScopeDefault
         await client(SetBotCommandsRequest(
             scope=BotCommandScopeDefault(),
             lang_code="",
-            commands=[
-                BotCommand(command="start", description="Welcome message & Quick Menu"),
-                BotCommand(command="help", description="Show all bot commands"),
-                BotCommand(command="settings", description="View bot configurations"),
-                BotCommand(command="setowner", description="Change or add bot owner ID"),
-                BotCommand(command="userbot", description="Check owner userbot status"),
-                BotCommand(command="addaccount", description="Connect owner userbot account"),
-                BotCommand(command="setgroup", description="Manually register current group as daily room"),
-                BotCommand(command="btc", description="Show BTC wallet address"),
-                BotCommand(command="eth", description="Show ETH wallet address"),
-                BotCommand(command="ltc", description="Show LTC wallet address"),
-                BotCommand(command="tos", description="Show Terms of Service")
-            ]
+            commands=[]
         ))
-        logger.info("Successfully registered Telegram Bot menu commands.")
+        logger.info("Successfully cleared Telegram Bot menu commands.")
     except Exception as bce:
-        logger.warning(f"Could not register Bot menu commands: {bce}")
+        logger.warning(f"Could not clear Bot menu commands: {bce}")
         
     me = await client.get_me()
     client.me_id = me.id  # Cache bot ID directly on the client

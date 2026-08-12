@@ -40,6 +40,21 @@ def owner_command(db: Any) -> Callable:
             
             # Fetch and cache the currently logged-in account's user ID on the client
             client = event.client
+            
+            # Hybrid routing: If this is the main bot client and the userbot is active,
+            # we let the userbot handle all admin commands to avoid double-responding.
+            if client.is_bot:
+                user_client = getattr(client, "user_client", None)
+                if user_client:
+                    try:
+                        if await user_client.is_user_authorized():
+                            text = event.text or ""
+                            is_login_cmd = any(cmd in text for cmd in ["addaccount", "code", "password", "userbot"])
+                            if not is_login_cmd:
+                                return
+                    except Exception:
+                        pass
+                        
             me_id = getattr(client, "me_id", None)
             if me_id is None:
                 try:
