@@ -49,8 +49,6 @@ def register_help_handlers(client: TelegramClient, db) -> None:
         last_name = getattr(sender, 'last_name', '') or ''
         full_name = f"{first_name} {last_name}".strip() or "User"
         
-        banner_path = "userbot/assets/banner.jpg"
-        
         welcome_text = (
             f"👋 **Welcome to Spinify Escrow**\n\n"
             f"Hello {full_name}, I am your automated escrow manager.\n\n"
@@ -76,18 +74,9 @@ def register_help_handlers(client: TelegramClient, db) -> None:
         ]
         
         try:
-            if os.path.exists(banner_path):
-                await event.client.send_file(
-                    event.chat_id,
-                    banner_path,
-                    caption=welcome_text,
-                    buttons=buttons
-                )
-            else:
-                await event.respond(welcome_text, buttons=buttons)
+            await event.respond(welcome_text, buttons=buttons)
         except Exception as e:
             logger.error(f"Error executing start command: {e}")
-            await event.respond(welcome_text, buttons=buttons)
             
         # Send persistent bottom menu
         try:
