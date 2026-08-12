@@ -83,7 +83,8 @@ def _extract_chat_entity(result: Any) -> Any:
 async def create_mm_group(
     client: TelegramClient,
     title: str,
-    participants: List[Union[str, int]]
+    participants: List[Union[str, int]],
+    bot_id: Optional[int] = None
 ) -> Tuple[Any, List[str], List[str]]:
     """
     Creates a new legacy group chat with the given title.
@@ -96,6 +97,14 @@ async def create_mm_group(
     resolved_users = []
     failed_resolutions = []
     
+    # Resolve the bot first if provided and different from client account
+    if bot_id:
+        try:
+            bot_ent = await resolve_user_entity(client, bot_id)
+            resolved_users.append(bot_ent)
+        except Exception as e:
+            logger.error(f"Failed to resolve bot client entity for group creation: {e}")
+            
     for p in participants:
         try:
             user_ent = await resolve_user_entity(client, p)
@@ -104,7 +113,7 @@ async def create_mm_group(
             logger.error(f"Failed to resolve participant '{p}': {e}")
             failed_resolutions.append(str(p))
             
-    if not resolved_users:
+    if not resolved_users or (len(resolved_users) == 1 and bot_id):
         raise ValueError(f"Could not resolve any of the participants: {participants}")
         
     chat_entity = None
@@ -120,6 +129,8 @@ async def create_mm_group(
         chat_entity = _extract_chat_entity(result)
         # Successfully created with all users
         for u in resolved_users:
+            if bot_id and u.id == bot_id:
+                continue
             identifier = getattr(u, 'username', None) or str(u.id)
             added_users.append(f"@{identifier}" if getattr(u, 'username', None) else identifier)
     except (UserPrivacyRestrictedError, RPCError) as e:
@@ -127,6 +138,8 @@ async def create_mm_group(
         
         # Fallback: Create group with first resolved user, then invite others
         for idx, primary_user in enumerate(resolved_users):
+            if bot_id and primary_user.id == bot_id:
+                continue
             try:
                 result = await call_with_retry(client, CreateChatRequest(
                     users=[primary_user],
@@ -145,13 +158,19 @@ async def create_mm_group(
                             user_id=other_user,
                             fwd_limit=0
                         ))
+                        if bot_id and other_user.id == bot_id:
+                            continue
                         other_id = getattr(other_user, 'username', None) or str(other_user.id)
                         added_users.append(f"@{other_id}" if getattr(other_user, 'username', None) else other_id)
                     except (UserPrivacyRestrictedError, UserAlreadyParticipantError) as ae:
+                        if bot_id and other_user.id == bot_id:
+                            continue
                         logger.warning(f"Failed to add participant {other_user.id}: {ae}")
                         other_id = getattr(other_user, 'username', None) or str(other_user.id)
                         failed_users.append(f"@{other_id}" if getattr(other_user, 'username', None) else other_id)
                     except Exception as ae:
+                        if bot_id and other_user.id == bot_id:
+                            continue
                         logger.error(f"Unexpected error adding participant {other_user.id}: {ae}")
                         other_id = getattr(other_user, 'username', None) or str(other_user.id)
                         failed_users.append(f"@{other_id}" if getattr(other_user, 'username', None) else other_id)
@@ -172,8 +191,38 @@ async def create_mm_group(
             chat_entity = _extract_chat_entity(result)
             # Since we couldn't add them directly, add all resolved users to failed list
             for u in resolved_users:
+                if bot_id and u.id == bot_id:
+                    continue
                 identifier = getattr(u, 'username', None) or str(u.id)
                 failed_users.append(f"@{identifier}" if getattr(u, 'username', None) else identifier)
+                
+            # If bot_id is provided, invite the bot to the supergroup and promote to admin
+            if bot_id:
+                try:
+                    from telethon.tl.functions.channels import InviteToChannelRequest, EditAdminRequest
+                    from telethon.tl.types import ChatAdminRights
+                    bot_ent = await resolve_user_entity(client, bot_id)
+                    await call_with_retry(client, InviteToChannelRequest(channel=chat_entity, users=[bot_ent]))
+                    # Promote to administrator
+                    await call_with_retry(client, EditAdminRequest(
+                        channel=chat_entity,
+                        user_id=bot_ent,
+                        admin_rights=ChatAdminRights(
+                            post_messages=True,
+                            add_admins=False,
+                            change_info=True,
+                            ban_users=True,
+                            pin_messages=True,
+                            invite_users=True,
+                            anonymous=False,
+                            manage_call=True,
+                            other=True
+                        ),
+                        rank="Escrow Manager"
+                    ))
+                    logger.info("Bot client successfully added and promoted in Megagroup.")
+                except Exception as b_err:
+                    logger.error(f"Failed to invite and promote bot client in megagroup: {b_err}")
         except Exception as e:
             logger.error(f"Failed to create megagroup fallback: {e}")
             raise RuntimeError(f"Failed to create group: privacy restrictions on all participants or other Telegram API limits. Fallback megagroup creation also failed: {e}")

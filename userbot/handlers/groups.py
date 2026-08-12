@@ -11,6 +11,17 @@ logger = logging.getLogger(__name__)
 # Memory store for pending close confirmations: chat_id -> timestamp
 pending_closes: Dict[int, datetime] = {}
 
+async def get_active_client(client: TelegramClient) -> TelegramClient:
+    """Helper to get the active client to perform group operations (preferring the userbot if active)."""
+    user_client = getattr(client, "user_client", None)
+    if user_client:
+        try:
+            if await user_client.is_user_authorized():
+                return user_client
+        except Exception:
+            pass
+    return client
+
 def register_group_handlers(client: TelegramClient, db) -> None:
     @client.on(events.NewMessage(pattern=r'^[./]mm(?:\s+(.+))?$'))
     @owner_command(db)
@@ -106,6 +117,11 @@ def register_group_handlers(client: TelegramClient, db) -> None:
             await event.respond("❌ **Usage**: `.mm <user1> <user2>` (Must provide exactly two participants)")
             return
             
+        # Determine the active client for administrative actions (prefer user_client if available)
+        active_client = await get_active_client(client)
+        userbot_active = (active_client != client)
+        bot_id = client.me_id
+        
         # Determine today's UTC date
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         
@@ -121,7 +137,7 @@ def register_group_handlers(client: TelegramClient, db) -> None:
         # Check if we can reuse today's daily group
         if daily_group_id and daily_group_date == today_str:
             try:
-                chat_entity = await client.get_entity(daily_group_id)
+                chat_entity = await group_service.resolve_chat_entity(active_client, daily_group_id)
                 target_chat_id = daily_group_id
                 logger.info(f"Reusing today's registered daily group: {target_chat_id}")
             except Exception as e:
@@ -133,8 +149,8 @@ def register_group_handlers(client: TelegramClient, db) -> None:
             if daily_group_id:
                 try:
                     logger.info(f"Cleaning up/leaving previous daily group: {daily_group_id}...")
-                    old_entity = await client.get_entity(daily_group_id)
-                    await group_service.leave_group(client, old_entity)
+                    old_entity = await group_service.resolve_chat_entity(active_client, daily_group_id)
+                    await group_service.leave_group(active_client, old_entity)
                 except Exception as le:
                     logger.warning(f"Could not automatically clean up old daily group {daily_group_id}: {le}")
             
@@ -144,7 +160,9 @@ def register_group_handlers(client: TelegramClient, db) -> None:
             
             status_msg = await event.respond(f"⏳ Creating new daily group room **{title}**...")
             try:
-                chat_entity, added, failed = await group_service.create_mm_group(client, title, parts)
+                chat_entity, added, failed = await group_service.create_mm_group(
+                    active_client, title, parts, bot_id=bot_id if userbot_active else None
+                )
                 from telethon import utils
                 target_chat_id = utils.get_peer_id(chat_entity)
                 new_group_created = True
@@ -171,16 +189,16 @@ def register_group_handlers(client: TelegramClient, db) -> None:
             from telethon.errors import UserAlreadyParticipantError
             from userbot.services.group_service import call_with_retry
             
-            chat_peer = await client.get_input_entity(target_chat_id)
+            chat_peer = await group_service.resolve_chat_input_peer(active_client, target_chat_id)
             
             for p in parts:
                 try:
-                    user_ent = await group_service.resolve_user_entity(client, p)
+                    user_ent = await group_service.resolve_user_entity(active_client, p)
                     try:
                         if isinstance(chat_peer, types.InputPeerChat):
-                            await call_with_retry(client, AddChatUserRequest(chat_id=chat_peer.chat_id, user_id=user_ent, fwd_limit=0))
+                            await call_with_retry(active_client, AddChatUserRequest(chat_id=chat_peer.chat_id, user_id=user_ent, fwd_limit=0))
                         else:
-                            await call_with_retry(client, InviteToChannelRequest(channel=chat_peer, users=[user_ent]))
+                            await call_with_retry(active_client, InviteToChannelRequest(channel=chat_peer, users=[user_ent]))
                         
                         identifier = getattr(user_ent, "username", None) or str(user_ent.id)
                         added.append(f"@{identifier}" if getattr(user_ent, "username", None) else identifier)
@@ -203,8 +221,8 @@ def register_group_handlers(client: TelegramClient, db) -> None:
         
         # Export group invite link
         if not chat_entity:
-            chat_entity = await client.get_entity(target_chat_id)
-        invite_link = await group_service.get_invite_link(client, chat_entity)
+            chat_entity = await group_service.resolve_chat_entity(active_client, target_chat_id)
+        invite_link = await group_service.get_invite_link(active_client, chat_entity)
         
         # Send DM containing invite link to both participants
         dm_sent = []
@@ -293,7 +311,8 @@ def register_group_handlers(client: TelegramClient, db) -> None:
         new_title = args.strip()
         
         # Update group title via Telegram API
-        await group_service.rename_group(client, chat_id, new_title)
+        active_client = await get_active_client(client)
+        await group_service.rename_group(active_client, chat_id, new_title)
         
         # Log event in DB
         await db.log_deal_event(deal["deal_id"], "renamed", f"Group renamed to: {new_title}")
@@ -353,7 +372,8 @@ def register_group_handlers(client: TelegramClient, db) -> None:
                         for p in participants_list:
                             if p and p != "Group Members":
                                 try:
-                                    await group_service.kick_user(client, chat_id, p)
+                                    active_client = await get_active_client(client)
+                                    await group_service.kick_user(active_client, chat_id, p)
                                     kicked_users.append(p)
                                 except Exception as ke:
                                     logger.warning(f"Could not kick participant {p}: {ke}")

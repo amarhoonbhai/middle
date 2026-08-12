@@ -47,6 +47,23 @@ async def start_bot() -> None:
     logger.info("Starting Telegram Bot daemon flow...")
     await client.start(bot_token=config.BOT_TOKEN)
     
+    # Initialize owner userbot client if a saved session exists
+    client.user_client = None
+    if os.path.exists("owner_session.session"):
+        logger.info("Saved owner userbot session detected. Initializing userbot client...")
+        try:
+            user_client = get_telegram_client("owner_session")
+            await user_client.connect()
+            if await user_client.is_user_authorized():
+                logger.info("Userbot client is authorized! Starting userbot client daemon...")
+                await user_client.start()
+                client.user_client = user_client
+            else:
+                logger.info("Userbot client session found but not authorized. Disconnecting userbot client.")
+                await user_client.disconnect()
+        except Exception as uce:
+            logger.error(f"Failed to auto-start owner userbot: {uce}")
+            
     # Pre-populate bot entity cache by fetching dialogs
     logger.info("Caching bot dialogs...")
     try:
@@ -66,6 +83,8 @@ async def start_bot() -> None:
                 BotCommand(command="help", description="Show all bot commands"),
                 BotCommand(command="settings", description="View bot configurations"),
                 BotCommand(command="setowner", description="Change or add bot owner ID"),
+                BotCommand(command="userbot", description="Check owner userbot status"),
+                BotCommand(command="addaccount", description="Connect owner userbot account"),
                 BotCommand(command="setgroup", description="Manually register current group as daily room"),
                 BotCommand(command="btc", description="Show BTC wallet address"),
                 BotCommand(command="eth", description="Show ETH wallet address"),
