@@ -104,7 +104,7 @@ def register_help_handlers(client: TelegramClient, db) -> None:
             
         # Send persistent bottom menu as a second message
         try:
-            await event.respond("⌨️ Use the bottom menu buttons for quick navigation:", buttons=reply_keyboard)
+            await event.respond("⌨️ Use the bottom menu buttons for quick navigation:", buttons=reply_keyboard, resize_keyboard=True)
         except Exception as e:
             logger.warning(f"Could not send reply keyboard: {e}")
 
