@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from typing import List, Tuple, Union, Any, Optional
 from telethon import TelegramClient, utils
 from telethon.tl import types
@@ -12,6 +13,20 @@ from telethon.errors import (
 )
 
 logger = logging.getLogger(__name__)
+
+async def call_with_retry(client: TelegramClient, request: Any) -> Any:
+    """
+    Executes a Telethon RPC request.
+    If a FloodWaitError (rate limit) is encountered, automatically sleeps for 
+    the required duration before retrying the call once.
+    """
+    try:
+        return await client(request)
+    except FloodWaitError as e:
+        logger.warning(f"Telegram FloodWaitError (Rate Limit) hit. Sleeping for {e.seconds} seconds before retrying...")
+        await asyncio.sleep(e.seconds)
+        # Retry after sleep
+        return await client(request)
 
 async def resolve_user_entity(client: TelegramClient, user_str: Union[str, int]) -> Any:
     """
@@ -70,7 +85,7 @@ async def create_mm_group(
     
     # Attempt to create group with all resolved users at once
     try:
-        result = await client(CreateChatRequest(
+        result = await call_with_retry(client, CreateChatRequest(
             users=resolved_users,
             title=title
         ))
@@ -85,7 +100,7 @@ async def create_mm_group(
         # Fallback: Create group with first resolved user, then invite others
         for idx, primary_user in enumerate(resolved_users):
             try:
-                result = await client(CreateChatRequest(
+                result = await call_with_retry(client, CreateChatRequest(
                     users=[primary_user],
                     title=title
                 ))
@@ -97,7 +112,7 @@ async def create_mm_group(
                 remaining_users = resolved_users[idx+1:] + resolved_users[:idx]
                 for other_user in remaining_users:
                     try:
-                        await client(AddChatUserRequest(
+                        await call_with_retry(client, AddChatUserRequest(
                             chat_id=chat_entity.id,
                             user_id=other_user,
                             fwd_limit=0
@@ -127,30 +142,30 @@ async def rename_group(client: TelegramClient, chat_entity: Any, new_title: str)
     """Renames the title of a legacy group or supergroup/channel."""
     peer = await client.get_input_entity(chat_entity)
     if isinstance(peer, types.InputPeerChannel):
-        await client(EditTitleRequest(channel=peer, title=new_title))
+        await call_with_retry(client, EditTitleRequest(channel=peer, title=new_title))
     elif isinstance(peer, types.InputPeerChat):
-        await client(EditChatTitleRequest(chat_id=peer.chat_id, title=new_title))
+        await call_with_retry(client, EditChatTitleRequest(chat_id=peer.chat_id, title=new_title))
     else:
         # Fallback to signed ID checks
         chat_id = utils.get_peer_id(chat_entity)
         if str(chat_id).startswith("-100"):
-            await client(EditTitleRequest(channel=chat_entity, title=new_title))
+            await call_with_retry(client, EditTitleRequest(channel=chat_entity, title=new_title))
         else:
-            await client(EditChatTitleRequest(chat_id=abs(chat_id), title=new_title))
+            await call_with_retry(client, EditChatTitleRequest(chat_id=abs(chat_id), title=new_title))
 
 async def leave_group(client: TelegramClient, chat_entity: Any) -> None:
     """Leaves a group chat or supergroup/channel."""
     peer = await client.get_input_entity(chat_entity)
     if isinstance(peer, types.InputPeerChannel):
-        await client(LeaveChannelRequest(channel=peer))
+        await call_with_retry(client, LeaveChannelRequest(channel=peer))
     elif isinstance(peer, types.InputPeerChat):
-        await client(DeleteChatUserRequest(chat_id=peer.chat_id, user_id='me'))
+        await call_with_retry(client, DeleteChatUserRequest(chat_id=peer.chat_id, user_id='me'))
     else:
         chat_id = utils.get_peer_id(chat_entity)
         if str(chat_id).startswith("-100"):
-            await client(LeaveChannelRequest(channel=chat_entity))
+            await call_with_retry(client, LeaveChannelRequest(channel=chat_entity))
         else:
-            await client(DeleteChatUserRequest(chat_id=abs(chat_id), user_id='me'))
+            await call_with_retry(client, DeleteChatUserRequest(chat_id=abs(chat_id), user_id='me'))
 
 async def get_invite_link(client: TelegramClient, chat_entity: Any) -> Optional[str]:
     """Generates and returns an invite link for a legacy group or channel."""
@@ -158,21 +173,20 @@ async def get_invite_link(client: TelegramClient, chat_entity: Any) -> Optional[
     try:
         peer = await client.get_input_entity(chat_entity)
         if isinstance(peer, types.InputPeerChat):
-            res = await client(ExportChatInviteRequest(chat_id=peer.chat_id))
+            res = await call_with_retry(client, ExportChatInviteRequest(chat_id=peer.chat_id))
             return res.link
         elif isinstance(peer, types.InputPeerChannel):
             from telethon.tl.functions.channels import ExportInviteRequest
-            res = await client(ExportInviteRequest(channel=peer))
+            res = await call_with_retry(client, ExportInviteRequest(channel=peer))
             return res.link
         else:
             chat_id = utils.get_peer_id(chat_entity)
             if str(chat_id).startswith("-100"):
                 from telethon.tl.functions.channels import ExportInviteRequest
-                res = await client(ExportInviteRequest(channel=chat_entity))
+                res = await call_with_retry(client, ExportInviteRequest(channel=chat_entity))
             else:
-                res = await client(ExportChatInviteRequest(chat_id=abs(chat_id)))
+                res = await call_with_retry(client, ExportChatInviteRequest(chat_id=abs(chat_id)))
             return res.link
     except Exception as e:
         logger.error(f"Failed to export invite link: {e}")
         return None
-
