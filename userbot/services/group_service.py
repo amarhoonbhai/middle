@@ -43,6 +43,34 @@ async def resolve_user_entity(client: TelegramClient, user_str: Union[str, int])
             
     return await client.get_entity(user_str)
 
+async def resolve_chat_input_peer(client: TelegramClient, chat_entity: Any) -> Any:
+    """Safely resolves any chat entity or integer ID to its corresponding InputPeer object."""
+    if isinstance(chat_entity, (int, str)):
+        chat_id = int(chat_entity)
+        from telethon.tl.types import PeerChannel, PeerChat
+        if str(chat_id).startswith("-100"):
+            clean_id = int(str(chat_id)[4:])
+            return await client.get_input_entity(PeerChannel(clean_id))
+        elif chat_id < 0:
+            return await client.get_input_entity(PeerChat(abs(chat_id)))
+        else:
+            return await client.get_input_entity(PeerChat(chat_id))
+    return await client.get_input_entity(chat_entity)
+
+async def resolve_chat_entity(client: TelegramClient, chat_entity: Any) -> Any:
+    """Safely resolves any chat entity or integer ID to its corresponding Chat/Channel entity."""
+    if isinstance(chat_entity, (int, str)):
+        chat_id = int(chat_entity)
+        from telethon.tl.types import PeerChannel, PeerChat
+        if str(chat_id).startswith("-100"):
+            clean_id = int(str(chat_id)[4:])
+            return await client.get_entity(PeerChannel(clean_id))
+        elif chat_id < 0:
+            return await client.get_entity(PeerChat(abs(chat_id)))
+        else:
+            return await client.get_entity(PeerChat(chat_id))
+    return await client.get_entity(chat_entity)
+
 def _extract_chat_entity(result: Any) -> Any:
     """Helper to extract the created chat entity from CreateChatRequest result."""
     if hasattr(result, "updates"):
@@ -155,13 +183,12 @@ async def create_mm_group(
 
 async def rename_group(client: TelegramClient, chat_entity: Any, new_title: str) -> None:
     """Renames the title of a legacy group or supergroup/channel."""
-    peer = await client.get_input_entity(chat_entity)
+    peer = await resolve_chat_input_peer(client, chat_entity)
     if isinstance(peer, types.InputPeerChannel):
         await call_with_retry(client, EditTitleRequest(channel=peer, title=new_title))
     elif isinstance(peer, types.InputPeerChat):
         await call_with_retry(client, EditChatTitleRequest(chat_id=peer.chat_id, title=new_title))
     else:
-        # Fallback to signed ID checks
         chat_id = utils.get_peer_id(chat_entity)
         if str(chat_id).startswith("-100"):
             await call_with_retry(client, EditTitleRequest(channel=chat_entity, title=new_title))
@@ -170,7 +197,7 @@ async def rename_group(client: TelegramClient, chat_entity: Any, new_title: str)
 
 async def leave_group(client: TelegramClient, chat_entity: Any) -> None:
     """Leaves a group chat or supergroup/channel."""
-    peer = await client.get_input_entity(chat_entity)
+    peer = await resolve_chat_input_peer(client, chat_entity)
     if isinstance(peer, types.InputPeerChannel):
         await call_with_retry(client, LeaveChannelRequest(channel=peer))
     elif isinstance(peer, types.InputPeerChat):
@@ -198,7 +225,7 @@ async def get_invite_link(client: TelegramClient, chat_entity: Any) -> Optional[
             
         if is_channel:
             from telethon.tl.functions.channels import ExportInviteRequest
-            peer = await client.get_input_entity(chat_id)
+            peer = await resolve_chat_input_peer(client, chat_id)
             res = await call_with_retry(client, ExportInviteRequest(channel=peer))
             return res.link
         else:
@@ -214,7 +241,7 @@ async def kick_user(client: TelegramClient, chat_entity: Any, user_str: Union[st
     """Kicks/removes a user from a legacy group or supergroup/channel."""
     try:
         user_ent = await resolve_user_entity(client, user_str)
-        peer = await client.get_input_entity(chat_entity)
+        peer = await resolve_chat_input_peer(client, chat_entity)
         if isinstance(peer, types.InputPeerChannel):
             from telethon.tl.functions.channels import EditBannedRequest
             from telethon.tl.types import ChatBannedRights

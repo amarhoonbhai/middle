@@ -209,7 +209,7 @@ def register_help_handlers(client: TelegramClient, db) -> None:
         
         if daily_group_id and daily_group_date == today_str:
             try:
-                chat_entity = await event.client.get_entity(daily_group_id)
+                chat_entity = await group_service.resolve_chat_entity(event.client, daily_group_id)
                 invite_link = await group_service.get_invite_link(event.client, chat_entity)
                 if invite_link:
                     await event.respond(
