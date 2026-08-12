@@ -28,7 +28,7 @@ async def is_owner(sender_id: int, db: Any) -> bool:
 def owner_command(db: Any) -> Callable:
     """
     Decorator for userbot commands.
-    1. Verifies that the sender is the owner.
+    1. Verifies that the sender matches the running logged-in account ID.
     2. Runs the command handler with error logging and friendly chat output.
     3. Deletes the outgoing command trigger on success if DELETE_COMMANDS is True.
     """
@@ -37,8 +37,27 @@ def owner_command(db: Any) -> Callable:
         async def wrapper(event: events.NewMessage.Event, *args: Any, **kwargs: Any) -> None:
             if not event.sender_id:
                 return
-            if not await is_owner(event.sender_id, db):
-                return
+            
+            # Fetch and cache the currently logged-in account's user ID on the client
+            client = event.client
+            me_id = getattr(client, "me_id", None)
+            if me_id is None:
+                try:
+                    me = await client.get_me()
+                    if me:
+                        client.me_id = me.id
+                        me_id = me.id
+                except Exception as e:
+                    logger.error(f"Failed to fetch logged-in user entity: {e}")
+            
+            # Perform validation: prioritize active client account ID
+            if me_id is not None:
+                if event.sender_id != me_id:
+                    return
+            else:
+                # Fallback to DB configuration check
+                if not await is_owner(event.sender_id, db):
+                    return
             
             try:
                 # Log execution start
