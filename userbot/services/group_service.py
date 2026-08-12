@@ -28,6 +28,15 @@ async def resolve_user_entity(client: TelegramClient, user_str: Union[str, int])
             
     return await client.get_entity(user_str)
 
+def _extract_chat_entity(result: Any) -> Any:
+    """Helper to extract the created chat entity from CreateChatRequest result."""
+    if hasattr(result, "updates"):
+        return result.updates.chats[0]
+    elif hasattr(result, "chats"):
+        return result.chats[0]
+    else:
+        raise AttributeError(f"Could not find created chat in Telegram response: {type(result)}")
+
 async def create_mm_group(
     client: TelegramClient,
     title: str,
@@ -65,7 +74,7 @@ async def create_mm_group(
             users=resolved_users,
             title=title
         ))
-        chat_entity = result.chats[0]
+        chat_entity = _extract_chat_entity(result)
         # Successfully created with all users
         for u in resolved_users:
             identifier = getattr(u, 'username', None) or str(u.id)
@@ -80,7 +89,7 @@ async def create_mm_group(
                     users=[primary_user],
                     title=title
                 ))
-                chat_entity = result.chats[0]
+                chat_entity = _extract_chat_entity(result)
                 primary_id = getattr(primary_user, 'username', None) or str(primary_user.id)
                 added_users.append(f"@{primary_id}" if getattr(primary_user, 'username', None) else primary_id)
                 
