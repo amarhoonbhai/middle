@@ -73,6 +73,27 @@ async def interactive_menu(db: Database) -> None:
             
             await client.start(bot_token=config.BOT_TOKEN)
             
+            # Register Bot commands in Telegram Menu
+            try:
+                from telethon.tl.functions.bots import SetBotCommandsRequest
+                from telethon.tl.types import BotCommand, BotCommandScopeDefault
+                await client(SetBotCommandsRequest(
+                    scope=BotCommandScopeDefault(),
+                    lang_code="",
+                    commands=[
+                        BotCommand(command="start", description="Welcome message & Quick Menu"),
+                        BotCommand(command="help", description="Show all bot commands"),
+                        BotCommand(command="settings", description="View bot configurations"),
+                        BotCommand(command="btc", description="Show BTC wallet address"),
+                        BotCommand(command="eth", description="Show ETH wallet address"),
+                        BotCommand(command="ltc", description="Show LTC wallet address"),
+                        BotCommand(command="tos", description="Show Terms of Service")
+                    ]
+                ))
+                logger.info("Successfully registered Telegram Bot menu commands.")
+            except Exception as bce:
+                logger.warning(f"Could not register Bot menu commands: {bce}")
+            
             me = await client.get_me()
             client.me_id = me.id  # Cache bot ID directly on the client
             await db.update_settings(owner_id=config.OWNER_ID)
@@ -249,6 +270,27 @@ async def run_cli() -> None:
         logger.info("Starting Telegram Client login flow...")
         await client.start(bot_token=config.BOT_TOKEN)
         
+        # Register Bot commands in Telegram Menu
+        try:
+            from telethon.tl.functions.bots import SetBotCommandsRequest
+            from telethon.tl.types import BotCommand, BotCommandScopeDefault
+            await client(SetBotCommandsRequest(
+                scope=BotCommandScopeDefault(),
+                lang_code="",
+                commands=[
+                    BotCommand(command="start", description="Welcome message & Quick Menu"),
+                    BotCommand(command="help", description="Show all bot commands"),
+                    BotCommand(command="settings", description="View bot configurations"),
+                    BotCommand(command="btc", description="Show BTC wallet address"),
+                    BotCommand(command="eth", description="Show ETH wallet address"),
+                    BotCommand(command="ltc", description="Show LTC wallet address"),
+                    BotCommand(command="tos", description="Show Terms of Service")
+                ]
+            ))
+            logger.info("Successfully registered Telegram Bot menu commands.")
+        except Exception as bce:
+            logger.warning(f"Could not register Bot menu commands: {bce}")
+            
         me = await client.get_me()
         client.me_id = me.id
         await db.update_settings(owner_id=config.OWNER_ID)
