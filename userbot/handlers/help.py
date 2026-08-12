@@ -68,6 +68,7 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
             buttons = [
                 [
                     Button.inline("🫧 Terms of Service", data="btn_tos"),
+                    Button.inline("ℹ️ Help", data="btn_help")
                 ],
                 [
                     Button.inline("💎 Escrow Wallets", data="btn_crypto"),
@@ -93,7 +94,8 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
                         KeyboardButton(text="🏠 Set Escrow Group")
                     ]),
                     KeyboardButtonRow(buttons=[
-                        KeyboardButton(text="⚙️ Settings")
+                        KeyboardButton(text="⚙️ Settings"),
+                        KeyboardButton(text="ℹ️ Help")
                     ])
                 ],
                 resize=True
@@ -102,6 +104,7 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
             buttons = [
                 [
                     Button.inline("🫧 Terms of Service", data="btn_tos"),
+                    Button.inline("ℹ️ Help", data="btn_help")
                 ],
                 [
                     Button.inline("💎 Escrow Wallets", data="btn_crypto")
@@ -114,7 +117,8 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
                         KeyboardButton(text="🫧 Terms of Service")
                     ]),
                     KeyboardButtonRow(buttons=[
-                        KeyboardButton(text="💎 Escrow Wallets")
+                        KeyboardButton(text="💎 Escrow Wallets"),
+                        KeyboardButton(text="ℹ️ Help")
                     ])
                 ],
                 resize=True
@@ -264,6 +268,46 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
                     buttons=[Button.inline("❌ Cancel", data="btn_cancel_login")]
                 )
 
+        elif data == "btn_help":
+            owner_active = await is_owner(event.sender_id, db)
+            if owner_active:
+                help_text = (
+                    "ℹ️ **Spinify Escrow — Owner Commands**\n\n"
+                    "**Userbot Commands** (run inside group):\n"
+                    "• `.mm @buyer @seller` — Register daily deal\n"
+                    "• `.setgroup` — Set current group as daily room\n"
+                    "• `.setgroup <id>` — Set group by ID (from DM)\n"
+                    "• `.close` — Close current deal\n"
+                    "• `.name <title>` — Rename current group\n"
+                    "• `.setamount <amt>` — Set deal amount\n"
+                    "• `.status` — Show deal status\n\n"
+                    "**Finance Commands**:\n"
+                    "• `.fee <amount>` — Calculate transaction fee\n"
+                    "• `.setfee <%>` — Set default fee percentage\n"
+                    "• `.setminfee <val>` — Set minimum fee amount\n\n"
+                    "**Crypto Wallet Commands**:\n"
+                    "• `.btc` / `.eth` / `.ltc` — View crypto addresses\n"
+                    "• `.setbtc <addr>` — Set BTC wallet address\n"
+                    "• `.seteth <addr>` — Set ETH wallet address\n"
+                    "• `.setltc <addr>` — Set LTC wallet address\n\n"
+                    "**Other Commands**:\n"
+                    "• `.rec` — Mark funds received\n"
+                    "• `.tos` — View Terms of Service\n"
+                    "• `.settos <text>` — Set Terms of Service text\n"
+                    "• `.block` — Block a user (reply to message)\n"
+                    "• `.settings` — View current configuration\n"
+                    "• `.addaccount` — Connect userbot account"
+                )
+            else:
+                help_text = (
+                    "ℹ️ **Spinify Escrow — Help**\n\n"
+                    "• 🧊 **Join Group** — Get a link to today's active escrow room\n"
+                    "• 🫧 **Terms of Service** — View the escrow terms\n"
+                    "• 💎 **Escrow Wallets** — View accepted crypto addresses\n\n"
+                    "For deal assistance, contact the Middleman Owner."
+                )
+            await event.reply(help_text)
+
     # --- Persistent Reply Keyboard Listeners ---
 
     @client.on(events.NewMessage(pattern=r'^🧊 Join Group$'))
@@ -352,3 +396,45 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
             "`https://t.me/joinchat/...`",
             buttons=[Button.inline("❌ Cancel", data="btn_cancel_login")]
         )
+
+    @client.on(events.NewMessage(pattern=r'^ℹ️ Help$'))
+    async def help_button_handler(event: events.NewMessage.Event) -> None:
+        """Shows help text from the bottom reply keyboard Help button."""
+        owner_active = await is_owner(event.sender_id, db)
+        if owner_active:
+            help_text = (
+                "ℹ️ **Spinify Escrow — Owner Commands**\n\n"
+                "**Userbot Commands** (run inside group):\n"
+                "• `.mm @buyer @seller` — Register daily deal\n"
+                "• `.setgroup` — Set current group as daily room\n"
+                "• `.setgroup <id>` — Set group by ID (from DM)\n"
+                "• `.close` — Close current deal\n"
+                "• `.name <title>` — Rename current group\n"
+                "• `.setamount <amt>` — Set deal amount\n"
+                "• `.status` — Show deal status\n\n"
+                "**Finance Commands**:\n"
+                "• `.fee <amount>` — Calculate transaction fee\n"
+                "• `.setfee <%>` — Set default fee percentage\n"
+                "• `.setminfee <val>` — Set minimum fee amount\n\n"
+                "**Crypto Wallet Commands**:\n"
+                "• `.btc` / `.eth` / `.ltc` — View crypto addresses\n"
+                "• `.setbtc <addr>` — Set BTC wallet address\n"
+                "• `.seteth <addr>` — Set ETH wallet address\n"
+                "• `.setltc <addr>` — Set LTC wallet address\n\n"
+                "**Other Commands**:\n"
+                "• `.rec` — Mark funds received\n"
+                "• `.tos` — View Terms of Service\n"
+                "• `.settos <text>` — Set Terms of Service text\n"
+                "• `.block` — Block a user (reply to message)\n"
+                "• `.settings` — View current configuration\n"
+                "• `.addaccount` — Connect userbot account"
+            )
+        else:
+            help_text = (
+                "ℹ️ **Spinify Escrow — Help**\n\n"
+                "• 🧊 **Join Group** — Get a link to today's active escrow room\n"
+                "• 🫧 **Terms of Service** — View the escrow terms\n"
+                "• 💎 **Escrow Wallets** — View accepted crypto addresses\n\n"
+                "For deal assistance, contact the Middleman Owner."
+            )
+        await event.respond(help_text)
