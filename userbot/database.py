@@ -37,7 +37,8 @@ class Database:
                     group_naming_template TEXT DEFAULT 'MM • Deal #{deal_id}',
                     owner_id INTEGER,
                     daily_group_id INTEGER,
-                    daily_group_date TEXT
+                    daily_group_date TEXT,
+                    daily_group_link TEXT
                 )
             """)
             
@@ -48,6 +49,8 @@ class Database:
                 cursor.execute("ALTER TABLE settings ADD COLUMN daily_group_id INTEGER")
             if "daily_group_date" not in columns:
                 cursor.execute("ALTER TABLE settings ADD COLUMN daily_group_date TEXT")
+            if "daily_group_link" not in columns:
+                cursor.execute("ALTER TABLE settings ADD COLUMN daily_group_link TEXT")
             
             # 2. deals table (not UNIQUE on chat_id to allow reuse of group chats for subsequent deals)
             cursor.execute("""

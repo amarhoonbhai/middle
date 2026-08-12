@@ -210,59 +210,44 @@ def register_settings_handlers(client: TelegramClient, db, is_userbot: bool = Fa
             from datetime import datetime, timezone as tz
             today_str = datetime.now(tz.utc).strftime("%Y-%m-%d")
             chat_id = None
+            group_link = None
             arg = text.strip()
 
             if arg.lstrip("-").isdigit():
-                # Plain numeric group ID — works directly, no resolution needed
+                # Plain numeric group ID
                 chat_id = int(arg)
             else:
-                # Need a Telegram account (userbot) to resolve links/usernames
-                is_invite_link = (
-                    "/+" in arg or
-                    "joinchat" in arg
-                )
+                # Store the provided link or username format
+                if arg.startswith("http://") or arg.startswith("https://") or arg.startswith("t.me/"):
+                    group_link = arg if arg.startswith("http") else f"https://{arg}"
+                elif arg.startswith("@"):
+                    group_link = f"https://t.me/{arg[1:]}"
+                else:
+                    group_link = f"https://t.me/{arg}"
+
+                # Try resolving numeric chat_id if active client can access it
                 user_client = getattr(client, "user_client", None)
-                uc_authorized = False
-                if user_client:
-                    try:
-                        uc_authorized = await user_client.is_user_authorized()
-                    except Exception:
-                        pass
-
-                if is_invite_link and not uc_authorized:
-                    # Private invite links CANNOT be resolved by a bot — user account required
-                    await event.respond(
-                        "❌ **Cannot resolve private invite link**\n\n"
-                        "Telegram does not allow bots to join via private invite links.\n"
-                        "Please do one of the following:\n\n"
-                        "1️⃣ **Connect your userbot first** (🔌 Connect Userbot), then try again\n"
-                        "2️⃣ **Use the plain group ID** instead:\n"
-                        "   • Open the group in Telegram Web\n"
-                        "   • The URL will look like `t.me/c/1234567890/1`\n"
-                        "   • Add `-100` in front: `-1001234567890`"
-                    )
-                    return
-
-                # Use userbot if available, otherwise try the bot (works for public @usernames)
-                resolve_client = user_client if uc_authorized else client
+                resolve_client = user_client if (user_client and getattr(user_client, "is_connected", lambda: False)()) else client
                 try:
                     entity = await resolve_client.get_entity(arg)
                     from telethon import utils as tu
                     chat_id = tu.get_peer_id(entity)
                 except Exception as e:
-                    await event.respond(
-                        f"❌ **Error**: Could not resolve group from `{arg}`.\n\n"
-                        f"`{e}`\n\n"
-                        "Please provide a valid group ID (e.g. `-1001234567890`) or public @username."
-                    )
-                    return
+                    logger.info(f"Could not resolve entity ID for {arg} (saved link directly): {e}")
 
-            await db.update_settings(daily_group_id=chat_id, daily_group_date=today_str)
+            await db.update_settings(
+                daily_group_id=chat_id,
+                daily_group_link=group_link,
+                daily_group_date=today_str
+            )
             login_state["step"] = None
+
+            display_info = f"🔗 {group_link}" if group_link else f"🆔 `{chat_id}`"
             await event.respond(
-                f"✅ **Success**: Group registered as today's active escrow room!\n"
+                f"✅ **Success**: Group registered as today's active escrow room!\n\n"
                 f"• **Date**: `{today_str}`\n"
-                f"• **Chat ID**: `{chat_id}`"
+                f"• **Room**: {display_info}\n\n"
+                f"This link will be sent to users via DM when `.mm` is created and when they click **🧊 Join Group**."
             )
 
         elif step == "awaiting_admin_id":

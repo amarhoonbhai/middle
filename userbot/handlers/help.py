@@ -372,25 +372,28 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
         """Sends today's daily group invite link to the user so they can join it."""
         settings = await db.get_settings()
         daily_group_id = settings.get("daily_group_id")
+        daily_group_link = settings.get("daily_group_link")
         daily_group_date = settings.get("daily_group_date")
         
         from datetime import datetime, timezone
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         
-        if daily_group_id and daily_group_date == today_str:
-            try:
-                chat_entity = await group_service.resolve_chat_entity(event.client, daily_group_id)
-                invite_link = await group_service.get_invite_link(event.client, chat_entity)
-                if invite_link:
-                    await event.respond(
-                        f"🔗 **Daily Room Active**\n\n"
-                        f"Click the link below to join today's active escrow deal room:\n{invite_link}"
-                    )
-                else:
-                    await event.respond("⚠️ Today's daily group is active, but I couldn't generate the invite link. Please ask the Middleman Owner for assistance.")
-            except Exception as e:
-                logger.error(f"Error fetching daily group entity: {e}")
-                await event.respond("⚠️ Today's daily group is active, but I could not access it. Please contact the Middleman Owner.")
+        if (daily_group_id or daily_group_link) and daily_group_date == today_str:
+            invite_link = daily_group_link
+            if not invite_link and daily_group_id:
+                try:
+                    chat_entity = await group_service.resolve_chat_entity(event.client, daily_group_id)
+                    invite_link = await group_service.get_invite_link(event.client, chat_entity)
+                except Exception as e:
+                    logger.error(f"Error fetching daily group entity: {e}")
+
+            if invite_link:
+                await event.respond(
+                    f"🔗 **Daily Room Active**\n\n"
+                    f"Click the link below to join today's active escrow deal room:\n{invite_link}"
+                )
+            else:
+                await event.respond("⚠️ Today's daily group is active, but I couldn't generate the invite link. Please ask the Middleman Owner for assistance.")
         else:
             await event.respond(
                 "ℹ️ **No active group room for today yet.**\n\n"

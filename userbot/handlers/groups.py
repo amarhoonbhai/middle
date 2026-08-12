@@ -130,6 +130,7 @@ def register_group_handlers(client: TelegramClient, db, is_userbot: bool = False
         
         # Load daily group settings
         daily_group_id = settings.get("daily_group_id")
+        daily_group_link = settings.get("daily_group_link")
         daily_group_date = settings.get("daily_group_date")
         
         target_chat_id = None
@@ -223,9 +224,14 @@ def register_group_handlers(client: TelegramClient, db, is_userbot: bool = False
         await db.update_deal(deal_id, participants=json.dumps(all_participants))
         
         # Export group invite link
-        if not chat_entity:
-            chat_entity = await group_service.resolve_chat_entity(active_client, target_chat_id)
-        invite_link = await group_service.get_invite_link(active_client, chat_entity)
+        invite_link = daily_group_link if (daily_group_date == today_str and daily_group_link) else None
+        if not invite_link and target_chat_id:
+            try:
+                if not chat_entity:
+                    chat_entity = await group_service.resolve_chat_entity(active_client, target_chat_id)
+                invite_link = await group_service.get_invite_link(active_client, chat_entity)
+            except Exception as e:
+                logger.warning(f"Could not export invite link from API: {e}")
         
         # Send DM containing invite link to both participants
         dm_sent = []
@@ -398,56 +404,52 @@ def register_group_handlers(client: TelegramClient, db, is_userbot: bool = False
             # Owner provided a group ID or invite link from DM
             arg = args.strip()
             if arg.lstrip("-").isdigit():
-                # Plain numeric ID — no resolution needed
+                # Plain numeric ID
                 chat_id = int(arg)
             else:
-                # Detect private invite links (t.me/+... or t.me/joinchat/...)
-                is_invite_link = "/+" in arg or "joinchat" in arg
+                if arg.startswith("http://") or arg.startswith("https://") or arg.startswith("t.me/"):
+                    group_link = arg if arg.startswith("http") else f"https://{arg}"
+                elif arg.startswith("@"):
+                    group_link = f"https://t.me/{arg[1:]}"
+                else:
+                    group_link = f"https://t.me/{arg}"
+
                 active_client = await get_active_client(client)
-                uc_is_user = not getattr(active_client, "is_bot", True)
-
-                if is_invite_link and not uc_is_user:
-                    await event.respond(
-                        "❌ **Cannot resolve private invite link**\n\n"
-                        "Telegram does not allow bots to use private invite links.\n"
-                        "Please do one of the following:\n\n"
-                        "1️⃣ **Connect your userbot first** (🔌 Connect Userbot), then try again\n"
-                        "2️⃣ **Use the plain group ID** instead:\n"
-                        "   • Open the group in Telegram Web\n"
-                        "   • URL looks like `t.me/c/1234567890/1`\n"
-                        "   • Add `-100` in front: `-1001234567890`"
-                    )
-                    return
-
                 try:
                     entity = await active_client.get_entity(arg)
                     from telethon import utils
                     chat_id = utils.get_peer_id(entity)
                 except Exception as e:
-                    await event.respond(
-                        f"❌ **Error**: Could not resolve group from `{arg}`.\n\n"
-                        f"`{e}`\n\n"
-                        "Please provide a valid group ID (e.g. `-1001234567890`) or public @username."
-                    )
-                    return
+                    logger.info(f"Could not resolve entity ID for {arg} (saved link directly): {e}")
 
         elif event.is_group:
             chat_id = event.chat_id
+            active_client = await get_active_client(client)
+            try:
+                chat_entity = await group_service.resolve_chat_entity(active_client, chat_id)
+                group_link = await group_service.get_invite_link(active_client, chat_entity)
+            except Exception:
+                pass
         else:
             await event.respond(
                 "❌ **Error**: Run this command inside a group, or provide a group ID/link:\n\n"
                 "`.setgroup -1001234567890`\n"
-                "`.setgroup https://t.me/joinchat/...`"
+                "`.setgroup https://t.me/+...`"
             )
             return
 
         # Save daily group info in database settings
-        await db.update_settings(daily_group_id=chat_id, daily_group_date=today_str)
+        await db.update_settings(
+            daily_group_id=chat_id,
+            daily_group_link=group_link,
+            daily_group_date=today_str
+        )
 
+        display_info = f"🔗 {group_link}" if group_link else f"🆔 `{chat_id}`"
         await event.respond(
             f"✅ **Success**: Group registered as today's active daily room!\n"
             f"• **Date**: `{today_str}`\n"
-            f"• **Chat ID**: `{chat_id}`"
+            f"• **Room**: {display_info}"
         )
 
     @client.on(events.NewMessage(pattern=r'^\.setamount(?:\s+(.+))?$'))
