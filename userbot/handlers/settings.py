@@ -5,7 +5,8 @@ from userbot.services.permissions import owner_command
 login_state = {
     "phone": None,
     "phone_code_hash": None,
-    "client": None
+    "client": None,
+    "step": None
 }
 
 def get_user_client() -> TelegramClient:
@@ -69,13 +70,139 @@ def register_settings_handlers(client: TelegramClient, db, is_userbot: bool = Fa
             await event.respond(f"✅ **Success**: Owner ID updated to `{new_owner_id}`.")
         return
 
+    @client.on(events.NewMessage)
+    @owner_command(db)
+    async def login_input_handler(event: events.NewMessage.Event) -> None:
+        """Captures prefix-less inputs from the owner when an interactive login step is active."""
+        if event.is_group:
+            return
+            
+        step = login_state.get("step")
+        if not step:
+            return
+            
+        # Ignore messages starting with command prefix character
+        text = (event.text or "").strip()
+        if text.startswith((".", "/")):
+            return
+            
+        if step == "awaiting_phone":
+            phone = text.replace(" ", "")
+            if not phone.startswith("+") and not phone.isdigit():
+                await event.respond("❌ **Error**: Phone number should start with `+` and contain country code (e.g., `+1234567890`). Please try again:")
+                return
+                
+            await event.respond(f"⏳ **Connecting to Telegram...**\nInitiating session for `{phone}`...")
+            try:
+                user_client = get_user_client()
+                await user_client.connect()
+                
+                # Check if already authorized
+                if await user_client.is_user_authorized():
+                    await event.respond("✅ **Userbot is already authorized and active!**\nThe bot will now use your account to perform group operations.")
+                    from userbot.handlers import register_all_handlers
+                    register_all_handlers(user_client, db, is_userbot=True)
+                    client.user_client = user_client
+                    login_state["step"] = None
+                    return
+                    
+                sent_code = await user_client.send_code_request(phone)
+                
+                login_state["phone"] = phone
+                login_state["phone_code_hash"] = sent_code.phone_code_hash
+                login_state["client"] = user_client
+                login_state["step"] = "awaiting_code"
+                
+                from telethon import Button
+                await event.respond(
+                    "📩 **Verification Code Sent!**\n\n"
+                    "Please enter the verification code you received (OTP) directly as a message in this chat.",
+                    buttons=[Button.inline("❌ Cancel Login", data="btn_cancel_login")]
+                )
+            except Exception as e:
+                await event.respond(f"❌ **Failed to initiate login**: {e}\n\nPlease try sending your phone number again:")
+                
+        elif step == "awaiting_code":
+            code = text.replace(" ", "")
+            if not code.isdigit():
+                await event.respond("❌ **Error**: The code must contain digits only. Please try again:")
+                return
+                
+            user_client = login_state["client"]
+            phone = login_state["phone"]
+            code_hash = login_state["phone_code_hash"]
+            
+            if not user_client:
+                await event.respond("❌ **Error**: Connection lost. Please click the button to try again.")
+                login_state["step"] = None
+                return
+                
+            await event.respond("⏳ **Verifying code...**")
+            
+            try:
+                from telethon.errors import SessionPasswordNeededError
+                try:
+                    await user_client.sign_in(phone, code, phone_code_hash=code_hash)
+                    # Success!
+                    await event.respond("✅ **Successfully authorized userbot account!**\nThe bot will now use your account to create groups and invite users.")
+                    from userbot.handlers import register_all_handlers
+                    register_all_handlers(user_client, db, is_userbot=True)
+                    client.user_client = user_client
+                    
+                    # Clear state
+                    login_state["phone"] = None
+                    login_state["phone_code_hash"] = None
+                    login_state["client"] = None
+                    login_state["step"] = None
+                except SessionPasswordNeededError:
+                    login_state["step"] = "awaiting_password"
+                    from telethon import Button
+                    await event.respond(
+                        "🔐 **Two-Step Verification (2FA) is active on this account!**\n\n"
+                        "Please enter your 2FA password directly in this chat:",
+                        buttons=[Button.inline("❌ Cancel Login", data="btn_cancel_login")]
+                    )
+            except Exception as e:
+                await event.respond(f"❌ **Sign-in failed**: {e}\n\nPlease enter the verification code again:")
+                
+        elif step == "awaiting_password":
+            pwd = text
+            user_client = login_state["client"]
+            if not user_client:
+                await event.respond("❌ **Error**: Connection lost. Please try again.")
+                login_state["step"] = None
+                return
+                
+            await event.respond("⏳ **Verifying 2FA password...**")
+            
+            try:
+                await user_client.sign_in(password=pwd)
+                await event.respond("✅ **Successfully authorized userbot account with 2FA!**\nThe bot will now use your account to create groups and invite users.")
+                from userbot.handlers import register_all_handlers
+                register_all_handlers(user_client, db, is_userbot=True)
+                client.user_client = user_client
+                
+                # Clear state
+                login_state["phone"] = None
+                login_state["phone_code_hash"] = None
+                login_state["client"] = None
+                login_state["step"] = None
+            except Exception as e:
+                await event.respond(f"❌ **2FA password verification failed**: {e}\n\nPlease enter your 2FA password again:")
+
     @client.on(events.NewMessage(pattern=r'^\.addaccount(?:\s+(.+))?$'))
     @owner_command(db)
     async def addaccount_command(event: events.NewMessage.Event) -> None:
         """Starts the interactive authorization process to connect the owner's personal userbot account."""
         args = event.pattern_match.group(1)
         if not args:
-            await event.respond("❌ **Usage**: `.addaccount <phone_number>` (e.g., `.addaccount +1234567890`)")
+            login_state["step"] = "awaiting_phone"
+            from telethon import Button
+            await event.respond(
+                "🔌 **Connect Owner Userbot Account**\n\n"
+                "Please enter your phone number (including country code, e.g. `+1234567890`) directly in this chat:",
+                buttons=[Button.inline("❌ Cancel Login", data="btn_cancel_login")]
+            )
             return
             
         phone = args.strip()
@@ -91,6 +218,7 @@ def register_settings_handlers(client: TelegramClient, db, is_userbot: bool = Fa
                 from userbot.handlers import register_all_handlers
                 register_all_handlers(user_client, db, is_userbot=True)
                 client.user_client = user_client
+                login_state["step"] = None
                 return
                 
             sent_code = await user_client.send_code_request(phone)
@@ -98,10 +226,13 @@ def register_settings_handlers(client: TelegramClient, db, is_userbot: bool = Fa
             login_state["phone"] = phone
             login_state["phone_code_hash"] = sent_code.phone_code_hash
             login_state["client"] = user_client
+            login_state["step"] = "awaiting_code"
             
+            from telethon import Button
             await event.respond(
                 "📩 **Login code sent to Telegram!**\n\n"
-                "Please enter the login code you received using `.code <your_code>` (e.g., `.code 12345` or `.code 1 3 4 5 3 4`)."
+                "Please enter the login code you received directly in this chat.",
+                buttons=[Button.inline("❌ Cancel Login", data="btn_cancel_login")]
             )
         except Exception as e:
             await event.respond(f"❌ **Failed to initiate login**: {e}")
@@ -119,7 +250,6 @@ def register_settings_handlers(client: TelegramClient, db, is_userbot: bool = Fa
             await event.respond("❌ **Usage**: `.code <verification_code>`")
             return
             
-        # Clean OTP: Remove all space characters to support formats like '1 3 4 5 3'
         code = args.strip().replace(" ", "")
         user_client = login_state["client"]
         phone = login_state["phone"]
@@ -141,10 +271,14 @@ def register_settings_handlers(client: TelegramClient, db, is_userbot: bool = Fa
                 login_state["phone"] = None
                 login_state["phone_code_hash"] = None
                 login_state["client"] = None
+                login_state["step"] = None
             except SessionPasswordNeededError:
+                login_state["step"] = "awaiting_password"
+                from telethon import Button
                 await event.respond(
                     "🔐 **Two-Factor Authentication (2FA) is enabled!**\n\n"
-                    "Please reply with your password using `.password <your_password>`."
+                    "Please reply with your password directly in this chat:",
+                    buttons=[Button.inline("❌ Cancel Login", data="btn_cancel_login")]
                 )
         except Exception as e:
             await event.respond(f"❌ **Sign-in failed**: {e}")
@@ -178,6 +312,7 @@ def register_settings_handlers(client: TelegramClient, db, is_userbot: bool = Fa
             login_state["phone"] = None
             login_state["phone_code_hash"] = None
             login_state["client"] = None
+            login_state["step"] = None
         except Exception as e:
             await event.respond(f"❌ **2FA verification failed**: {e}")
 
@@ -200,5 +335,5 @@ def register_settings_handlers(client: TelegramClient, db, is_userbot: bool = Fa
             await event.respond(
                 f"👤 **Userbot Connection Status**\n\n"
                 f"• **Status**: `Disconnected` ❌\n"
-                f"• **Notice**: The bot is currently operating using standard Bot API limits. Use `/addaccount <phone_number>` to connect your user account for enhanced group creation."
+                f"• **Notice**: The bot is currently operating using standard Bot API limits. Use `.addaccount <phone_number>` or the helper buttons to connect your user account for enhanced group creation."
             )

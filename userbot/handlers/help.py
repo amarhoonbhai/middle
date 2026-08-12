@@ -203,12 +203,24 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
             if not await is_owner(event.sender_id, db):
                 await event.reply("❌ **Access Denied**: Only the Middleman Owner can connect userbots.")
             else:
+                from userbot.handlers.settings import login_state
+                login_state["step"] = "awaiting_phone"
                 await event.reply(
                     "🔌 **Connect Owner Userbot Account**\n\n"
-                    "To connect your userbot account, please send `.addaccount <phone_number>` in this private chat.\n\n"
-                    "**Example**:\n"
-                    "`.addaccount +1234567890`"
+                    "Please enter your phone number (including country code, e.g. `+1234567890`) directly in this chat:",
+                    buttons=[Button.inline("❌ Cancel Login", data="btn_cancel_login")]
                 )
+                
+        elif data == "btn_cancel_login":
+            if not await is_owner(event.sender_id, db):
+                await event.reply("❌ **Access Denied**.")
+            else:
+                from userbot.handlers.settings import login_state
+                login_state["phone"] = None
+                login_state["phone_code_hash"] = None
+                login_state["client"] = None
+                login_state["step"] = None
+                await event.reply("❌ **Userbot login cancelled.**")
                 
         elif data == "btn_set_escrow_group":
             if not await is_owner(event.sender_id, db):
@@ -285,11 +297,13 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
     @client.on(events.NewMessage(pattern=r'^🔌 Connect Userbot$'))
     @owner_command(db)
     async def connect_userbot_button_handler(event: events.NewMessage.Event) -> None:
+        from userbot.handlers.settings import login_state
+        login_state["step"] = "awaiting_phone"
+        from telethon import Button
         await event.respond(
             "🔌 **Connect Owner Userbot Account**\n\n"
-            "To connect your userbot account, please send `.addaccount <phone_number>` in this private chat.\n\n"
-            "**Example**:\n"
-            "`.addaccount +1234567890`"
+            "Please enter your phone number (including country code, e.g. `+1234567890`) directly in this chat:",
+            buttons=[Button.inline("❌ Cancel Login", data="btn_cancel_login")]
         )
 
     @client.on(events.NewMessage(pattern=r'^🏠 Set Escrow Group$'))
