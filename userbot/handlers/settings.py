@@ -24,3 +24,28 @@ def register_settings_handlers(client: TelegramClient, db) -> None:
             f"• **Total Deals**: `{total_deals}`"
         )
         await event.respond(response)
+
+    @client.on(events.NewMessage(pattern=r'^[./]setowner(?:\s+(.+))?$'))
+    @owner_command(db)
+    async def setowner_command(event: events.NewMessage.Event) -> None:
+        """Sets a new owner ID. Can be run with an ID argument or in reply to a user."""
+        args = event.pattern_match.group(1)
+        new_owner_id = None
+        
+        # Check if replying to a message
+        if event.is_reply:
+            reply_msg = await event.get_reply_message()
+            new_owner_id = reply_msg.sender_id
+        elif args:
+            try:
+                new_owner_id = int(args.strip())
+            except ValueError:
+                await event.respond("❌ **Error**: Invalid owner ID format. Must be a numeric ID.")
+                return
+                
+        if not new_owner_id:
+            await event.respond("❌ **Error**: Please provide a numeric user ID or reply to a user's message with `/setowner`.")
+            return
+            
+        await db.update_settings(owner_id=new_owner_id)
+        await event.respond(f"✅ **Success**: Owner ID updated to `{new_owner_id}`.")

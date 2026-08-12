@@ -57,21 +57,38 @@ def register_help_handlers(client: TelegramClient, db) -> None:
         )
         
         # Build interactive inline buttons
-        buttons = [
-            [
-                Button.inline("📜 Terms of Service", data="btn_tos"),
-            ],
-            [
-                Button.inline("💰 Escrow Wallets", data="btn_crypto"),
-                Button.inline("📊 Bot Stats", data="btn_stats")
+        if owner_active:
+            buttons = [
+                [
+                    Button.inline("📜 Terms of Service", data="btn_tos"),
+                ],
+                [
+                    Button.inline("💰 Escrow Wallets", data="btn_crypto"),
+                    Button.inline("📊 Bot Stats", data="btn_stats")
+                ]
             ]
-        ]
-        
-        # Bottom persistent reply keyboard buttons
-        reply_keyboard = [
-            [Button.text("🔗 Join Group"), Button.text("📜 Terms of Service")],
-            [Button.text("💰 Escrow Wallets"), Button.text("📊 Bot Stats")]
-        ]
+            
+            # Bottom persistent reply keyboard buttons for Owner
+            reply_keyboard = [
+                [Button.text("🔗 Join Group"), Button.text("📜 Terms of Service")],
+                [Button.text("💰 Escrow Wallets"), Button.text("📊 Bot Stats")],
+                [Button.text("⚙️ Settings")]
+            ]
+        else:
+            buttons = [
+                [
+                    Button.inline("📜 Terms of Service", data="btn_tos"),
+                ],
+                [
+                    Button.inline("💰 Escrow Wallets", data="btn_crypto")
+                ]
+            ]
+            
+            # Bottom persistent reply keyboard buttons for General Users
+            reply_keyboard = [
+                [Button.text("🔗 Join Group"), Button.text("📜 Terms of Service")],
+                [Button.text("💰 Escrow Wallets")]
+            ]
         
         try:
             await event.respond(welcome_text, buttons=buttons)
@@ -83,6 +100,30 @@ def register_help_handlers(client: TelegramClient, db) -> None:
             await event.respond("⌨️ Quick menu:", buttons=reply_keyboard, resize_keyboard=True)
         except Exception as e:
             logger.warning(f"Could not send reply keyboard: {e}")
+
+    @client.on(events.NewMessage(pattern=r'^⚙️ Settings$'))
+    @owner_command(db)
+    async def settings_button_handler(event: events.NewMessage.Event) -> None:
+        """Triggers settings display from bottom menu button (restricted to owner)."""
+        settings = await db.get_settings()
+        total_deals, active_deals = await db.get_stats()
+        
+        tos_ok = "✅ Yes" if settings.get("tos_text") else "❌ No"
+        fee_pct = settings.get("fee_percentage", "3.0")
+        min_fee = settings.get("min_fee", "0.0")
+        
+        response = (
+            "⚙️ **Spinify Escrow Settings**\n\n"
+            f"• **Fee Rate**: `{fee_pct}%`\n"
+            f"• **Minimum Fee**: `${float(min_fee or 0):,.2f}`\n"
+            f"• **BTC Wallet**: `{settings.get('btc_address') or 'Not Configured'}`\n"
+            f"• **ETH Wallet**: `{settings.get('eth_address') or 'Not Configured'}`\n"
+            f"• **LTC Wallet**: `{settings.get('ltc_address') or 'Not Configured'}`\n"
+            f"• **TOS Status**: {tos_ok}\n\n"
+            f"• **Active Deals**: `{active_deals}`\n"
+            f"• **Total Deals**: `{total_deals}`"
+        )
+        await event.respond(response)
 
     @client.on(events.CallbackQuery)
     async def callback_query_handler(event: events.CallbackQuery.Event) -> None:
@@ -110,13 +151,16 @@ def register_help_handlers(client: TelegramClient, db) -> None:
             await event.reply(wallet_info)
             
         elif data == "btn_stats":
-            total, active = await db.get_stats()
-            stats_info = (
-                "📊 **Escrow Statistics**\n\n"
-                f"• **Active Deals**: `{active}`\n"
-                f"• **Total Closed Deals**: `{total}`"
-            )
-            await event.reply(stats_info)
+            if not await is_owner(event.sender_id, db):
+                await event.reply("❌ **Access Denied**: Only the Middleman Owner can view stats.")
+            else:
+                total, active = await db.get_stats()
+                stats_info = (
+                    "📊 **Escrow Statistics**\n\n"
+                    f"• **Active Deals**: `{active}`\n"
+                    f"• **Total Closed Deals**: `{total}`"
+                )
+                await event.reply(stats_info)
             
         elif data == "btn_close_deal":
             clicker_id = event.sender_id
