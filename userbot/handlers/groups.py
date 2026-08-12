@@ -18,10 +18,14 @@ def register_group_handlers(client: TelegramClient, db) -> None:
         args = event.pattern_match.group(1)
         from userbot.config import config
         
-        # 1. Hybrid check: If no arguments and executed in a group, register the current group
-        if not args:
-            if not event.is_group:
-                await event.respond(
+        # 1. Hybrid check: If no arguments and executed in DMs, warn and return
+        if not args and not event.is_group:
+            await event.respond(
+                "❌ **Usage**: `.mm <user1> <user2>`\n"
+                "(Specify participants in private chat to create a new group, or run `.mm` inside a group chat to activate it)"
+            )
+            return
+
         from telethon.tl import types
         from telethon.errors import UserPrivacyRestrictedError, RPCError
         
