@@ -17,14 +17,18 @@ def register_settings_handlers(client: TelegramClient, db) -> None:
         min_fee = settings.get("min_fee", "0.0")
         
         response = (
-            "⚙️ **Userbot Settings & Stats**\n\n"
-            f"• **Fee Percentage**: {fee_pct}%\n"
-            f"• **Minimum Fee**: ${float(min_fee or 0):,.2f}\n"
-            f"• **BTC Configured**: {btc_ok}\n"
-            f"• **ETH Configured**: {eth_ok}\n"
-            f"• **LTC Configured**: {ltc_ok}\n"
-            f"• **TOS Configured**: {tos_ok}\n\n"
-            f"• **Active Deals**: {active_deals}\n"
-            f"• **Total Deals**: {total_deals}"
+            "🛡️ **SPINIFY ESCROW SYSTEM STATUS**\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "⚙️ **Service Configurations:**\n"
+            f" • **Fee Rate**: `{fee_pct}%`\n"
+            f" • **Minimum Fee**: `${float(min_fee or 0):,.2f}`\n"
+            f" • **BTC Wallet**: `{settings.get('btc_address') or 'Not Configured'}`\n"
+            f" • **ETH Wallet**: `{settings.get('eth_address') or 'Not Configured'}`\n"
+            f" • **LTC Wallet**: `{settings.get('ltc_address') or 'Not Configured'}`\n\n"
+            "📊 **Escrow Statistics:**\n"
+            f" • **TOS Status**: {tos_ok}\n"
+            f" • **Active Deals**: `{active_deals}`\n"
+            f" • **Total Processed**: `{total_deals}`\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━"
         )
         await event.respond(response)

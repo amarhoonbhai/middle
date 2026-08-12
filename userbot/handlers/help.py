@@ -12,68 +12,68 @@ def register_help_handlers(client: TelegramClient, db) -> None:
     @owner_command(db)
     async def help_command(event: events.NewMessage.Event) -> None:
         help_text = (
-            "ℹ️ **Available Commands (Supports both / and . prefixes)**\n\n"
-            "**MM Operations:**\n"
-            "• `/mm @buyer @seller` - Register/setup daily deal room\n"
-            "• `/setgroup` - Manually set current group as today's active daily room\n"
-            "• `/close` - Close current deal safely (requires confirmation)\n"
-            "• `/name <name>` - Rename the MM group\n"
-            "• `/fee <amount>` - Calculate middleman fee\n"
-            "• `/rec` - Mark funds as received\n"
-            "• `/tos` - Send configured Terms of Service\n\n"
-            "**Crypto Addresses:**\n"
-            "• `/btc` - Show BTC address\n"
-            "• `/eth` - Show ETH address\n"
-            "• `/ltc` - Show LTC address\n\n"
-            "**Owner Settings:**\n"
-            "• `/settings` - View current settings and statistics\n"
-            "• `/setfee <%>` - Set default fee percentage\n"
-            "• `/setminfee <val>` - Set minimum fee amount\n"
-            "• `/setbtc <addr>` - Set BTC wallet address\n"
-            "• `/seteth <addr>` - Set ETH wallet address\n"
-            "• `/setltc <addr>` - Set LTC wallet address\n"
-            "• `/settos <text>` - Set Terms of Service (or reply with `/settos`)\n\n"
-            "**Moderation:**\n"
-            "• `/block` - Block user (reply to their message)"
+            "ℹ️ **SPINIFY ESCROW SYSTEM COMMANDS**\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "🤝 **Escrow Management:**\n"
+            " • `/mm @buyer @seller` — Register/setup daily deal room\n"
+            " • `/setgroup` — Register current group chat as daily room\n"
+            " • `/close` — Initiate secure escrow closure\n"
+            " • `/name <title>` — Rename the current group room\n"
+            " • `/fee <amount>` — Calculate middleman transaction fee\n"
+            " • `/rec` — Mark transaction funds as received\n"
+            " • `/tos` — Display configured Terms of Service\n\n"
+            "💰 **Crypto Wallets:**\n"
+            " • `/btc` — View BTC payment address\n"
+            " • `/eth` — View ETH payment address\n"
+            " • `/ltc` — View LTC payment address\n\n"
+            "⚙️ **Admin Configurations:**\n"
+            " • `/settings` — View service parameters and history\n"
+            " • `/setfee <%>` — Update default fee rate\n"
+            " • `/setminfee <val>` — Update minimum fee amount\n"
+            " • `/setbtc <addr>` — Configure BTC payout wallet\n"
+            " • `/seteth <addr>` — Configure ETH payout wallet\n"
+            " • `/setltc <addr>` — Configure LTC payout wallet\n"
+            " • `/settos <text>` — Update Terms of Service text\n\n"
+            "🛡️ **Moderation:**\n"
+            " • `/block` — Block user from using system (reply to message)\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "*Note: Commands support both `/` and `.` prefixes.*"
         )
         await event.respond(help_text)
 
     @client.on(events.NewMessage(pattern=r'^[./]start$'))
     async def start_command(event: events.NewMessage.Event) -> None:
-        """Welcomes users in DM, fetches their First/Last name and PFP, showing inline buttons and bottom menu."""
+        """Welcomes users in DM, displays the premium system banner, greets them, and registers the bottom menu."""
         sender = await event.get_sender()
         if not sender:
             return
             
         first_name = getattr(sender, 'first_name', '') or ''
         last_name = getattr(sender, 'last_name', '') or ''
-        full_name = f"{first_name} {last_name}".strip() or "User"
+        full_name = f"{first_name} {last_name}".strip() or "Valued Client"
         
-        # Create temporary dir for profiles
-        os.makedirs("logs/profiles", exist_ok=True)
-        pfp_path = None
+        banner_path = "userbot/assets/banner.jpg"
         
-        try:
-            # Download sender profile picture
-            pfp_path = await event.client.download_profile_photo(sender, file="logs/profiles/")
-        except Exception as e:
-            logger.warning(f"Could not download profile photo for {sender.id}: {e}")
-            
         welcome_text = (
-            f"👋 **Welcome to the Escrow Middleman Bot, {full_name}!**\n\n"
+            f"🛡️ **SPINIFY ESCROW SYSTEM SECURED**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"👋 **Welcome, {full_name}!**\n\n"
             "I am your automated transaction security manager. "
-            "I help buyers, sellers, and middlemen trade digital assets safely.\n\n"
-            "**Quick Actions Menu:**"
+            "I secure trades between buyers, sellers, and middlemen.\n\n"
+            "• **Account Verification**: `Active`\n"
+            f"• **Telegram ID**: `{sender.id}`\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "⚡ **Quick Action Buttons:**"
         )
         
         # Build interactive inline buttons
         buttons = [
             [
-                Button.inline("📜 View Terms of Service", data="btn_tos"),
+                Button.inline("📜 Terms of Service", data="btn_tos"),
             ],
             [
-                Button.inline("💰 Wallets", data="btn_crypto"),
-                Button.inline("📊 Stats", data="btn_stats")
+                Button.inline("💰 Escrow Wallets", data="btn_crypto"),
+                Button.inline("📊 Stats Dashboard", data="btn_stats")
             ]
         ]
         
@@ -84,18 +84,14 @@ def register_help_handlers(client: TelegramClient, db) -> None:
         ]
         
         try:
-            if pfp_path and os.path.exists(pfp_path):
-                # Send photo with welcome text as caption and inline buttons
+            if os.path.exists(banner_path):
+                # Send premium official system banner with welcome text as caption
                 await event.client.send_file(
                     event.chat_id,
-                    pfp_path,
+                    banner_path,
                     caption=welcome_text,
                     buttons=buttons
                 )
-                try:
-                    os.remove(pfp_path)
-                except Exception:
-                    pass
             else:
                 await event.respond(welcome_text, buttons=buttons)
         except Exception as e:
