@@ -12,58 +12,50 @@ def register_help_handlers(client: TelegramClient, db) -> None:
     @owner_command(db)
     async def help_command(event: events.NewMessage.Event) -> None:
         help_text = (
-            "ℹ️ **SPINIFY ESCROW SYSTEM COMMANDS**\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "🤝 **Escrow Management:**\n"
-            " • `/mm @buyer @seller` — Register/setup daily deal room\n"
-            " • `/setgroup` — Register current group chat as daily room\n"
-            " • `/close` — Initiate secure escrow closure\n"
-            " • `/name <title>` — Rename the current group room\n"
-            " • `/fee <amount>` — Calculate middleman transaction fee\n"
-            " • `/rec` — Mark transaction funds as received\n"
-            " • `/tos` — Display configured Terms of Service\n\n"
-            "💰 **Crypto Wallets:**\n"
-            " • `/btc` — View BTC payment address\n"
-            " • `/eth` — View ETH payment address\n"
-            " • `/ltc` — View LTC payment address\n\n"
-            "⚙️ **Admin Configurations:**\n"
-            " • `/settings` — View service parameters and history\n"
-            " • `/setfee <%>` — Update default fee rate\n"
-            " • `/setminfee <val>` — Update minimum fee amount\n"
-            " • `/setbtc <addr>` — Configure BTC payout wallet\n"
-            " • `/seteth <addr>` — Configure ETH payout wallet\n"
-            " • `/setltc <addr>` — Configure LTC payout wallet\n"
-            " • `/settos <text>` — Update Terms of Service text\n\n"
-            "🛡️ **Moderation:**\n"
-            " • `/block` — Block user from using system (reply to message)\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "*Note: Commands support both `/` and `.` prefixes.*"
+            "ℹ️ **Spinify Escrow Commands**\n\n"
+            "**Escrow Commands**\n"
+            "• `/mm @buyer @seller` - Register daily deal\n"
+            "• `/setgroup` - Set current group as daily room\n"
+            "• `/close` - Close current deal\n"
+            "• `/name <title>` - Rename current group\n"
+            "• `/fee <amount>` - Calculate transaction fee\n"
+            "• `/rec` - Mark funds as received\n"
+            "• `/tos` - View Terms of Service\n\n"
+            "**Crypto Addresses**\n"
+            "• `/btc` - View BTC address\n"
+            "• `/eth` - View ETH address\n"
+            "• `/ltc` - View LTC address\n\n"
+            "**Settings (Owner Only)**\n"
+            "• `/settings` - View current configuration\n"
+            "• `/setfee <%>` - Set default fee percentage\n"
+            "• `/setminfee <val>` - Set minimum fee amount\n"
+            "• `/setbtc <addr>` - Set BTC wallet address\n"
+            "• `/seteth <addr>` - Set ETH wallet address\n"
+            "• `/setltc <addr>` - Set LTC wallet address\n"
+            "• `/settos <text>` - Set Terms of Service text\n"
+            "• `/block` - Block user (reply to their message)\n\n"
+            "*(Commands support both / and . prefixes)*"
         )
         await event.respond(help_text)
 
     @client.on(events.NewMessage(pattern=r'^[./]start$'))
     async def start_command(event: events.NewMessage.Event) -> None:
-        """Welcomes users in DM, displays the premium system banner, greets them, and registers the bottom menu."""
+        """Welcomes users in DM, greets them, and registers the bottom menu."""
         sender = await event.get_sender()
         if not sender:
             return
             
         first_name = getattr(sender, 'first_name', '') or ''
         last_name = getattr(sender, 'last_name', '') or ''
-        full_name = f"{first_name} {last_name}".strip() or "Valued Client"
+        full_name = f"{first_name} {last_name}".strip() or "User"
         
         banner_path = "userbot/assets/banner.jpg"
         
         welcome_text = (
-            f"🛡️ **SPINIFY ESCROW SYSTEM SECURED**\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"👋 **Welcome, {full_name}!**\n\n"
-            "I am your automated transaction security manager. "
-            "I secure trades between buyers, sellers, and middlemen.\n\n"
-            "• **Account Verification**: `Active`\n"
-            f"• **Telegram ID**: `{sender.id}`\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "⚡ **Quick Action Buttons:**"
+            f"👋 **Welcome to Spinify Escrow**\n\n"
+            f"Hello {full_name}, I am your automated escrow manager.\n\n"
+            f"• **Your Telegram ID**: `{sender.id}`\n\n"
+            "Use the buttons below or `/help` to see all commands."
         )
         
         # Build interactive inline buttons
@@ -73,7 +65,7 @@ def register_help_handlers(client: TelegramClient, db) -> None:
             ],
             [
                 Button.inline("💰 Escrow Wallets", data="btn_crypto"),
-                Button.inline("📊 Stats Dashboard", data="btn_stats")
+                Button.inline("📊 Bot Stats", data="btn_stats")
             ]
         ]
         
@@ -85,7 +77,6 @@ def register_help_handlers(client: TelegramClient, db) -> None:
         
         try:
             if os.path.exists(banner_path):
-                # Send premium official system banner with welcome text as caption
                 await event.client.send_file(
                     event.chat_id,
                     banner_path,
@@ -98,9 +89,9 @@ def register_help_handlers(client: TelegramClient, db) -> None:
             logger.error(f"Error executing start command: {e}")
             await event.respond(welcome_text, buttons=buttons)
             
-        # Send persistent bottom menu as a second message
+        # Send persistent bottom menu
         try:
-            await event.respond("⌨️ Use the bottom menu buttons for quick navigation:", buttons=reply_keyboard, resize_keyboard=True)
+            await event.respond("⌨️ Quick menu:", buttons=reply_keyboard, resize_keyboard=True)
         except Exception as e:
             logger.warning(f"Could not send reply keyboard: {e}")
 
@@ -110,7 +101,7 @@ def register_help_handlers(client: TelegramClient, db) -> None:
         data = event.data.decode("utf-8")
         settings = await db.get_settings()
         
-        # Acknowledge the callback immediately to remove loading spinner
+        # Acknowledge the callback immediately
         await event.answer()
         
         if data == "btn_tos":
@@ -122,7 +113,7 @@ def register_help_handlers(client: TelegramClient, db) -> None:
             eth = settings.get("eth_address") or "Not Set"
             ltc = settings.get("ltc_address") or "Not Set"
             wallet_info = (
-                "💰 **Escrow Crypto Addresses:**\n\n"
+                "💰 **Escrow Crypto Addresses**\n\n"
                 f"• **BTC**: `{btc}`\n"
                 f"• **ETH**: `{eth}`\n"
                 f"• **LTC**: `{ltc}`"
@@ -132,9 +123,9 @@ def register_help_handlers(client: TelegramClient, db) -> None:
         elif data == "btn_stats":
             total, active = await db.get_stats()
             stats_info = (
-                "📊 **Escrow Statistics:**\n\n"
-                f"• **Active Deals**: {active}\n"
-                f"• **Total Closed Deals**: {total}"
+                "📊 **Escrow Statistics**\n\n"
+                f"• **Active Deals**: `{active}`\n"
+                f"• **Total Closed Deals**: `{total}`"
             )
             await event.reply(stats_info)
             
@@ -143,7 +134,7 @@ def register_help_handlers(client: TelegramClient, db) -> None:
             if not await is_owner(clicker_id, db):
                 await event.reply("❌ **Access Denied**: Only the Middleman Owner can close deals.")
             else:
-                await event.reply("⚠️ **Closing Deal**: Please type `/close` or `/close confirm` in the chat to execute closure.")
+                await event.reply("⚠️ **Closing Deal**: Type `/close` or `/close confirm` in this chat to execute.")
 
     # --- Persistent Reply Keyboard Listeners ---
 
@@ -190,7 +181,7 @@ def register_help_handlers(client: TelegramClient, db) -> None:
         eth = settings.get("eth_address") or "Not Set"
         ltc = settings.get("ltc_address") or "Not Set"
         wallet_info = (
-            "💰 **Escrow Crypto Addresses:**\n\n"
+            "💰 **Escrow Crypto Addresses**\n\n"
             f"• **BTC**: `{btc}`\n"
             f"• **ETH**: `{eth}`\n"
             f"• **LTC**: `{ltc}`"
@@ -201,8 +192,8 @@ def register_help_handlers(client: TelegramClient, db) -> None:
     async def stats_button_handler(event: events.NewMessage.Event) -> None:
         total, active = await db.get_stats()
         stats_info = (
-            "📊 **Escrow Statistics:**\n\n"
-            f"• **Active Deals**: {active}\n"
-            f"• **Total Closed Deals**: {total}"
+            "📊 **Escrow Statistics**\n\n"
+            f"• **Active Deals**: `{active}`\n"
+            f"• **Total Closed Deals**: `{total}`"
         )
         await event.respond(stats_info)
