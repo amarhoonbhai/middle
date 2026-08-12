@@ -37,29 +37,33 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
 
     @client.on(events.NewMessage(pattern=r'^[./]start$'))
     async def start_command(event: events.NewMessage.Event) -> None:
-        """Welcomes users in DM, greets them, and registers the bottom menu."""
+        """Welcomes users in DM with their profile photo and bold name."""
+        import io
         sender = await event.get_sender()
         if not sender:
             return
-            
+
         first_name = getattr(sender, 'first_name', '') or ''
-        last_name = getattr(sender, 'last_name', '') or ''
-        full_name = f"{first_name} {last_name}".strip() or "User"
-        
+        last_name  = getattr(sender, 'last_name',  '') or ''
+        # Bold name using Telegram markdown
+        bold_name  = f"**{(first_name + ' ' + last_name).strip() or 'User'}**"
+
         # Check if the user is the owner
         owner_active = await is_owner(sender.id, db)
-        
+
         welcome_text = (
-            f"👋 **Welcome to Spinify Escrow**\n\n"
-            f"Hello {full_name}, I am your automated escrow manager.\n\n"
-            f"• **Your Telegram ID**: `{sender.id}`\n\n"
+            f"👋 Welcome to **Spinify Escrow**\n\n"
+            f"Hello {bold_name}!\n"
+            f"I am your automated escrow manager.\n\n"
+            f"• **ID**: `{sender.id}`\n"
         )
         if owner_active:
-            welcome_text += "Use the buttons below or `/help` to see all admin commands."
+            welcome_text += "• **Role**: `Owner` 👑\n\n"
+            welcome_text += "Use the buttons below to manage deals, wallets and settings."
         else:
-            welcome_text += "Use the buttons below to check wallets or terms of service."
-        
-        # Build interactive inline buttons and persistent bottom menu
+            welcome_text += "\nUse the buttons below to check wallets or terms of service."
+
+        # Build inline buttons
         if owner_active:
             buttons = [
                 [
@@ -74,8 +78,6 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
                     Button.inline("🏠 Set Escrow Group", data="btn_set_escrow_group")
                 ]
             ]
-            
-            # Bottom persistent reply keyboard buttons for Owner
             reply_keyboard = ReplyKeyboardMarkup(
                 rows=[
                     KeyboardButtonRow(buttons=[
@@ -105,8 +107,6 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
                     Button.inline("💎 Escrow Wallets", data="btn_crypto")
                 ]
             ]
-            
-            # Bottom persistent reply keyboard buttons for General Users
             reply_keyboard = ReplyKeyboardMarkup(
                 rows=[
                     KeyboardButtonRow(buttons=[
@@ -119,17 +119,38 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
                 ],
                 resize=True
             )
-        
+
+        # Try to fetch and send profile photo with caption
+        photo_sent = False
         try:
-            await event.respond(welcome_text, buttons=buttons)
-        except Exception as e:
-            logger.error(f"Error executing start command: {e}")
-            
-        # Send persistent bottom menu
+            buf = io.BytesIO()
+            result = await client.download_profile_photo(sender.id, file=buf)
+            if result:
+                buf.seek(0)
+                await client.send_file(
+                    event.chat_id,
+                    file=buf,
+                    caption=welcome_text,
+                    buttons=buttons,
+                    parse_mode="md"
+                )
+                photo_sent = True
+        except Exception as pe:
+            logger.warning(f"Could not fetch profile photo for {sender.id}: {pe}")
+
+        # Fallback: send text-only welcome if no photo
+        if not photo_sent:
+            try:
+                await event.respond(welcome_text, buttons=buttons)
+            except Exception as e:
+                logger.error(f"Error sending start welcome: {e}")
+
+        # Send persistent bottom reply keyboard
         try:
             await event.respond("⌨️ Quick menu:", buttons=reply_keyboard)
         except Exception as e:
             logger.warning(f"Could not send reply keyboard: {e}")
+
 
     @client.on(events.NewMessage(pattern=r'^⚙️ Settings$'))
     @owner_command(db)
