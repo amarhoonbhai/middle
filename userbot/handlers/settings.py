@@ -212,21 +212,48 @@ def register_settings_handlers(client: TelegramClient, db, is_userbot: bool = Fa
             chat_id = None
             arg = text.strip()
 
-            # Detect numeric group ID (may start with -)
             if arg.lstrip("-").isdigit():
+                # Plain numeric group ID — works directly, no resolution needed
                 chat_id = int(arg)
             else:
-                # Try resolving via userbot (needed for private links)
-                user_client = getattr(client, "user_client", None) or client
+                # Need a Telegram account (userbot) to resolve links/usernames
+                is_invite_link = (
+                    "/+" in arg or
+                    "joinchat" in arg
+                )
+                user_client = getattr(client, "user_client", None)
+                uc_authorized = False
+                if user_client:
+                    try:
+                        uc_authorized = await user_client.is_user_authorized()
+                    except Exception:
+                        pass
+
+                if is_invite_link and not uc_authorized:
+                    # Private invite links CANNOT be resolved by a bot — user account required
+                    await event.respond(
+                        "❌ **Cannot resolve private invite link**\n\n"
+                        "Telegram does not allow bots to join via private invite links.\n"
+                        "Please do one of the following:\n\n"
+                        "1️⃣ **Connect your userbot first** (🔌 Connect Userbot), then try again\n"
+                        "2️⃣ **Use the plain group ID** instead:\n"
+                        "   • Open the group in Telegram Web\n"
+                        "   • The URL will look like `t.me/c/1234567890/1`\n"
+                        "   • Add `-100` in front: `-1001234567890`"
+                    )
+                    return
+
+                # Use userbot if available, otherwise try the bot (works for public @usernames)
+                resolve_client = user_client if uc_authorized else client
                 try:
-                    entity = await user_client.get_entity(arg)
+                    entity = await resolve_client.get_entity(arg)
                     from telethon import utils as tu
                     chat_id = tu.get_peer_id(entity)
                 except Exception as e:
                     await event.respond(
                         f"❌ **Error**: Could not resolve group from `{arg}`.\n\n"
                         f"`{e}`\n\n"
-                        "Please make sure you provide a valid group ID (e.g. `-1001234567890`) or invite link."
+                        "Please provide a valid group ID (e.g. `-1001234567890`) or public @username."
                     )
                     return
 

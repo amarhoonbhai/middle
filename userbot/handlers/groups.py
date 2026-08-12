@@ -397,19 +397,40 @@ def register_group_handlers(client: TelegramClient, db, is_userbot: bool = False
         if args:
             # Owner provided a group ID or invite link from DM
             arg = args.strip()
-            # Support plain negative IDs like -1001234567890 or just the number
             if arg.lstrip("-").isdigit():
+                # Plain numeric ID — no resolution needed
                 chat_id = int(arg)
             else:
-                # Try to resolve username or t.me link
+                # Detect private invite links (t.me/+... or t.me/joinchat/...)
+                is_invite_link = "/+" in arg or "joinchat" in arg
+                active_client = await get_active_client(client)
+                uc_is_user = not getattr(active_client, "is_bot", True)
+
+                if is_invite_link and not uc_is_user:
+                    await event.respond(
+                        "❌ **Cannot resolve private invite link**\n\n"
+                        "Telegram does not allow bots to use private invite links.\n"
+                        "Please do one of the following:\n\n"
+                        "1️⃣ **Connect your userbot first** (🔌 Connect Userbot), then try again\n"
+                        "2️⃣ **Use the plain group ID** instead:\n"
+                        "   • Open the group in Telegram Web\n"
+                        "   • URL looks like `t.me/c/1234567890/1`\n"
+                        "   • Add `-100` in front: `-1001234567890`"
+                    )
+                    return
+
                 try:
-                    active_client = await get_active_client(client)
                     entity = await active_client.get_entity(arg)
                     from telethon import utils
                     chat_id = utils.get_peer_id(entity)
                 except Exception as e:
-                    await event.respond(f"❌ **Error**: Could not resolve group from `{arg}`.\n\n{e}")
+                    await event.respond(
+                        f"❌ **Error**: Could not resolve group from `{arg}`.\n\n"
+                        f"`{e}`\n\n"
+                        "Please provide a valid group ID (e.g. `-1001234567890`) or public @username."
+                    )
                     return
+
         elif event.is_group:
             chat_id = event.chat_id
         else:
