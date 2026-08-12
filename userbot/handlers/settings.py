@@ -92,7 +92,17 @@ def register_settings_handlers(client: TelegramClient, db, is_userbot: bool = Fa
                 await event.respond("❌ **Error**: Phone number should start with `+` and contain country code (e.g., `+1234567890`). Please try again:")
                 return
                 
+            # Clear previous active client if exists to avoid sqlite locks
+            old_client = login_state.get("client")
+            if old_client:
+                try:
+                    await old_client.disconnect()
+                except Exception:
+                    pass
+                login_state["client"] = None
+                
             await event.respond(f"⏳ **Connecting to Telegram...**\nInitiating session for `{phone}`...")
+            user_client = None
             try:
                 user_client = get_user_client()
                 await user_client.connect()
@@ -120,6 +130,11 @@ def register_settings_handlers(client: TelegramClient, db, is_userbot: bool = Fa
                     buttons=[Button.inline("❌ Cancel Login", data="btn_cancel_login")]
                 )
             except Exception as e:
+                if user_client:
+                    try:
+                        await user_client.disconnect()
+                    except Exception:
+                        pass
                 await event.respond(f"❌ **Failed to initiate login**: {e}\n\nPlease try sending your phone number again:")
                 
         elif step == "awaiting_code":
@@ -195,6 +210,16 @@ def register_settings_handlers(client: TelegramClient, db, is_userbot: bool = Fa
     async def addaccount_command(event: events.NewMessage.Event) -> None:
         """Starts the interactive authorization process to connect the owner's personal userbot account."""
         args = event.pattern_match.group(1)
+        
+        # Clear previous active client if exists to avoid sqlite locks
+        old_client = login_state.get("client")
+        if old_client:
+            try:
+                await old_client.disconnect()
+            except Exception:
+                pass
+            login_state["client"] = None
+            
         if not args:
             login_state["step"] = "awaiting_phone"
             from telethon import Button
@@ -208,6 +233,7 @@ def register_settings_handlers(client: TelegramClient, db, is_userbot: bool = Fa
         phone = args.strip()
         await event.respond(f"⏳ **Connecting to Telegram...**\nInitiating session for `{phone}`...")
         
+        user_client = None
         try:
             user_client = get_user_client()
             await user_client.connect()
@@ -235,6 +261,11 @@ def register_settings_handlers(client: TelegramClient, db, is_userbot: bool = Fa
                 buttons=[Button.inline("❌ Cancel Login", data="btn_cancel_login")]
             )
         except Exception as e:
+            if user_client:
+                try:
+                    await user_client.disconnect()
+                except Exception:
+                    pass
             await event.respond(f"❌ **Failed to initiate login**: {e}")
 
     @client.on(events.NewMessage(pattern=r'^\.code(?:\s+(.+))?$'))

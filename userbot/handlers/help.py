@@ -216,6 +216,12 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
                 await event.reply("❌ **Access Denied**.")
             else:
                 from userbot.handlers.settings import login_state
+                user_client = login_state.get("client")
+                if user_client:
+                    try:
+                        await user_client.disconnect()
+                    except Exception:
+                        pass
                 login_state["phone"] = None
                 login_state["phone_code_hash"] = None
                 login_state["client"] = None
