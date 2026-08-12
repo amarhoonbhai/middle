@@ -281,3 +281,16 @@ class Database:
 
     async def get_stats(self) -> Tuple[int, int]:
         return await asyncio.to_thread(self._get_stats)
+
+    def _get_all_deals(self) -> List[Dict[str, Any]]:
+        with self.lock:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM deals ORDER BY deal_id DESC")
+            rows = cursor.fetchall()
+            conn.close()
+            return [dict(r) for r in rows]
+
+    async def get_all_deals(self) -> List[Dict[str, Any]]:
+        return await asyncio.to_thread(self._get_all_deals)
+
