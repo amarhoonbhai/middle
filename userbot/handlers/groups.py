@@ -16,8 +16,64 @@ def register_group_handlers(client: TelegramClient, db) -> None:
     @owner_command(db)
     async def mm_command(event: events.NewMessage.Event) -> None:
         args = event.pattern_match.group(1)
+        from userbot.config import config
+        
+        # 1. Hybrid check: If no arguments and executed in a group, register the current group
         if not args:
-            await event.respond("❌ **Usage**: `.mm <user1> <user2>`\n(e.g., `.mm @buyer @seller` or `.mm 123456789 987654321`)")
+            if not event.is_group:
+                await event.respond(
+                    "❌ **Usage**: `.mm <user1> <user2>`\n"
+                    "(Run inside a group chat to activate it for a deal, or specify participants in private chat to create a new group)"
+                )
+                return
+                
+            chat_id = event.chat_id
+            
+            # Check if there is already an active deal in this group
+            existing_deal = await db.get_deal(chat_id)
+            if existing_deal:
+                formatted_deal_id = f"{existing_deal['deal_id']:04d}"
+                await event.respond(f"⚠️ **Notice**: This group is already registered for active **Deal #{formatted_deal_id}**.")
+                return
+                
+            # Iterate group participants to register them in the deal metadata
+            participants = []
+            try:
+                async for user in client.iter_participants(chat_id):
+                    # Exclude bots and the owner themselves
+                    if not user.bot and user.id != config.OWNER_ID:
+                        username = getattr(user, "username", None)
+                        participants.append(f"@{username}" if username else str(user.id))
+            except Exception as e:
+                logger.warning(f"Could not iterate participants in chat {chat_id}: {e}")
+                
+            if not participants:
+                participants = ["Group Members"]
+                
+            # Create deal in SQLite bound to the current group
+            deal_id = await db.create_deal(chat_id, participants)
+            formatted_deal_id = f"{deal_id:04d}"
+            
+            settings = await db.get_settings()
+            welcome_text = (
+                f"🤝 **Deal #{formatted_deal_id} activated in this group.**\n\n"
+                "Please read the Terms of Service before proceeding.\n"
+                "Both parties should confirm the agreed amount and transaction terms before payment.\n\n"
+                f"• **Participants**: {', '.join(participants)}"
+            )
+            await event.respond(welcome_text)
+            
+            # Send and pin TOS
+            tos_text = settings.get("tos_text")
+            if tos_text:
+                tos_msg = await client.send_message(
+                    chat_id, 
+                    f"📜 **Terms of Service for Deal #{formatted_deal_id}**\n\n{tos_text}"
+                )
+                try:
+                    await client.pin_message(chat_id, tos_msg.id, notify=True)
+                except Exception as pe:
+                    logger.warning(f"Could not pin TOS message in group {chat_id}: {pe}")
             return
             
         parts = args.split()

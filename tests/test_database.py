@@ -84,6 +84,6 @@ async def test_deal_status_transitions(db: Database) -> None:
     
     # 3. Close deal
     await db.close_deal(deal_id)
-    deal = await db.get_deal(5001)
+    deal = await db.get_deal_by_id(deal_id)
     assert deal["status"] == "closed"
     assert deal["closed_at"] is not None

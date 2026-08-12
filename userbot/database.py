@@ -39,11 +39,11 @@ class Database:
                 )
             """)
             
-            # 2. deals table
+            # 2. deals table (not UNIQUE on chat_id to allow reuse of group chats for subsequent deals)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS deals (
                     deal_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    chat_id INTEGER UNIQUE,
+                    chat_id INTEGER,
                     created_at TEXT NOT NULL,
                     status TEXT NOT NULL DEFAULT 'active',
                     amount TEXT DEFAULT '0.00',
@@ -53,6 +53,30 @@ class Database:
                     closed_at TEXT
                 )
             """)
+            
+            # Database migration: remove UNIQUE constraint from chat_id if it exists in older databases
+            cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='deals'")
+            row = cursor.fetchone()
+            if row and "UNIQUE" in row[0]:
+                cursor.execute("ALTER TABLE deals RENAME TO deals_old")
+                cursor.execute("""
+                    CREATE TABLE deals (
+                        deal_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        chat_id INTEGER,
+                        created_at TEXT NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'active',
+                        amount TEXT DEFAULT '0.00',
+                        fee TEXT DEFAULT '0.00',
+                        participants TEXT,
+                        funds_received INTEGER DEFAULT 0,
+                        closed_at TEXT
+                    )
+                """)
+                cursor.execute("""
+                    INSERT INTO deals (deal_id, chat_id, created_at, status, amount, fee, participants, funds_received, closed_at)
+                    SELECT deal_id, chat_id, created_at, status, amount, fee, participants, funds_received, closed_at FROM deals_old
+                """)
+                cursor.execute("DROP TABLE deals_old")
             
             # 3. blocked_users table
             cursor.execute("""
@@ -159,7 +183,7 @@ class Database:
         with self.lock:
             conn = self._get_conn()
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM deals WHERE chat_id = ?", (chat_id,))
+            cursor.execute("SELECT * FROM deals WHERE chat_id = ? AND status = 'active' ORDER BY deal_id DESC LIMIT 1", (chat_id,))
             row = cursor.fetchone()
             conn.close()
             return dict(row) if row else None
