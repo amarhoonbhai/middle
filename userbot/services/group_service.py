@@ -133,7 +133,22 @@ async def create_mm_group(
                 continue
                 
     if not chat_entity:
-        raise RuntimeError("Failed to create group: privacy restrictions on all participants or other Telegram API limits.")
+        logger.info("Could not create legacy group due to privacy settings. Falling back to Megagroup (Supergroup) creation...")
+        try:
+            from telethon.tl.functions.channels import CreateChannelRequest
+            result = await call_with_retry(client, CreateChannelRequest(
+                title=title,
+                about="Middleman Escrow Group",
+                megagroup=True
+            ))
+            chat_entity = _extract_chat_entity(result)
+            # Since we couldn't add them directly, add all resolved users to failed list
+            for u in resolved_users:
+                identifier = getattr(u, 'username', None) or str(u.id)
+                failed_users.append(f"@{identifier}" if getattr(u, 'username', None) else identifier)
+        except Exception as e:
+            logger.error(f"Failed to create megagroup fallback: {e}")
+            raise RuntimeError(f"Failed to create group: privacy restrictions on all participants or other Telegram API limits. Fallback megagroup creation also failed: {e}")
         
     failed_users.extend(failed_resolutions)
     return chat_entity, added_users, failed_users

@@ -263,7 +263,13 @@ def register_group_handlers(client: TelegramClient, db) -> None:
                 logger.warning(f"Could not pin TOS message in group {signed_chat_id}: {pe}")
                 
         await status_msg.delete()
-        await event.respond(f"✅ **Deal #{formatted_deal_id} group created successfully!**\nGroup Title: {title}")
+        response_text = f"✅ **Deal #{formatted_deal_id} group created successfully!**\n• **Group Title**: {title}"
+        if invite_link:
+            response_text += f"\n• **Invite Link**: {invite_link}"
+        if failed:
+            response_text += f"\n\n⚠️ **Participants not added directly**: {', '.join(failed)}"
+            
+        await event.respond(response_text)
 
     @client.on(events.NewMessage(pattern=r'^\.name(?:\s+(.+))?$'))
     @owner_command(db)
