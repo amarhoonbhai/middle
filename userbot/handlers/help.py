@@ -63,11 +63,11 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
         if owner_active:
             buttons = [
                 [
-                    Button.inline("📜 Terms of Service", data="btn_tos"),
+                    Button.inline("🫧 Terms of Service", data="btn_tos"),
                 ],
                 [
-                    Button.inline("💰 Escrow Wallets", data="btn_crypto"),
-                    Button.inline("📊 Bot Stats", data="btn_stats")
+                    Button.inline("💎 Escrow Wallets", data="btn_crypto"),
+                    Button.inline("📊 Escrow Stats", data="btn_stats")
                 ]
             ]
             
@@ -75,12 +75,12 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
             reply_keyboard = ReplyKeyboardMarkup(
                 rows=[
                     KeyboardButtonRow(buttons=[
-                        KeyboardButton(text="🔗 Join Group"),
-                        KeyboardButton(text="📜 Terms of Service")
+                        KeyboardButton(text="🧊 Join Group"),
+                        KeyboardButton(text="🫧 Terms of Service")
                     ]),
                     KeyboardButtonRow(buttons=[
-                        KeyboardButton(text="💰 Escrow Wallets"),
-                        KeyboardButton(text="📊 Bot Stats")
+                        KeyboardButton(text="💎 Escrow Wallets"),
+                        KeyboardButton(text="📊 Escrow Stats")
                     ]),
                     KeyboardButtonRow(buttons=[
                         KeyboardButton(text="⚙️ Settings")
@@ -91,10 +91,10 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
         else:
             buttons = [
                 [
-                    Button.inline("📜 Terms of Service", data="btn_tos"),
+                    Button.inline("🫧 Terms of Service", data="btn_tos"),
                 ],
                 [
-                    Button.inline("💰 Escrow Wallets", data="btn_crypto")
+                    Button.inline("💎 Escrow Wallets", data="btn_crypto")
                 ]
             ]
             
@@ -102,11 +102,11 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
             reply_keyboard = ReplyKeyboardMarkup(
                 rows=[
                     KeyboardButtonRow(buttons=[
-                        KeyboardButton(text="🔗 Join Group"),
-                        KeyboardButton(text="📜 Terms of Service")
+                        KeyboardButton(text="🧊 Join Group"),
+                        KeyboardButton(text="🫧 Terms of Service")
                     ]),
                     KeyboardButtonRow(buttons=[
-                        KeyboardButton(text="💰 Escrow Wallets")
+                        KeyboardButton(text="💎 Escrow Wallets")
                     ])
                 ],
                 resize=True
@@ -193,7 +193,7 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
 
     # --- Persistent Reply Keyboard Listeners ---
 
-    @client.on(events.NewMessage(pattern=r'^🔗 Join Group$'))
+    @client.on(events.NewMessage(pattern=r'^🧊 Join Group$'))
     async def join_group_button_handler(event: events.NewMessage.Event) -> None:
         """Sends today's daily group invite link to the user so they can join it."""
         settings = await db.get_settings()
@@ -223,13 +223,13 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
                 "The Middleman Owner will create or register the room once a deal is initiated."
             )
 
-    @client.on(events.NewMessage(pattern=r'^📜 Terms of Service$'))
+    @client.on(events.NewMessage(pattern=r'^🫧 Terms of Service$'))
     async def tos_button_handler(event: events.NewMessage.Event) -> None:
         settings = await db.get_settings()
         tos_text = settings.get("tos_text") or "Terms of Service not configured yet."
         await event.respond(f"📜 **Terms of Service**\n\n{tos_text}")
 
-    @client.on(events.NewMessage(pattern=r'^💰 Escrow Wallets$'))
+    @client.on(events.NewMessage(pattern=r'^💎 Escrow Wallets$'))
     async def wallets_button_handler(event: events.NewMessage.Event) -> None:
         settings = await db.get_settings()
         btc = settings.get("btc_address") or "Not Set"
@@ -243,7 +243,7 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
         )
         await event.respond(wallet_info)
 
-    @client.on(events.NewMessage(pattern=r'^📊 Bot Stats$'))
+    @client.on(events.NewMessage(pattern=r'^📊 Escrow Stats$'))
     async def stats_button_handler(event: events.NewMessage.Event) -> None:
         total, active = await db.get_stats()
         stats_info = (

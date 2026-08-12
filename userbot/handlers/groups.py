@@ -85,11 +85,11 @@ def register_group_handlers(client: TelegramClient, db, is_userbot: bool = False
             from telethon import Button
             welcome_buttons = [
                 [
-                    Button.inline("📜 Read TOS", data="btn_tos"),
-                    Button.inline("💰 Wallets", data="btn_crypto")
+                    Button.inline("🫧 Read TOS", data="btn_tos"),
+                    Button.inline("💎 Wallets", data="btn_crypto")
                 ],
                 [
-                    Button.inline("🏁 Close Deal", data="btn_close_deal")
+                    Button.inline("🧊 Close Deal", data="btn_close_deal")
                 ]
             ]
             await event.respond(welcome_text, buttons=welcome_buttons)
@@ -262,11 +262,11 @@ def register_group_handlers(client: TelegramClient, db, is_userbot: bool = False
         from telethon import Button
         welcome_buttons = [
             [
-                Button.inline("📜 Read TOS", data="btn_tos"),
-                Button.inline("💰 Wallets", data="btn_crypto")
+                Button.inline("🫧 Read TOS", data="btn_tos"),
+                Button.inline("💎 Wallets", data="btn_crypto")
             ],
             [
-                Button.inline("🏁 Close Deal", data="btn_close_deal")
+                Button.inline("🧊 Close Deal", data="btn_close_deal")
             ]
         ]
         await client.send_message(target_chat_id, welcome_text, buttons=welcome_buttons)
