@@ -49,12 +49,18 @@ def register_help_handlers(client: TelegramClient, db) -> None:
         last_name = getattr(sender, 'last_name', '') or ''
         full_name = f"{first_name} {last_name}".strip() or "User"
         
+        # Check if the user is the owner
+        owner_active = await is_owner(sender.id, db)
+        
         welcome_text = (
             f"👋 **Welcome to Spinify Escrow**\n\n"
             f"Hello {full_name}, I am your automated escrow manager.\n\n"
             f"• **Your Telegram ID**: `{sender.id}`\n\n"
-            "Use the buttons below or `/help` to see all commands."
         )
+        if owner_active:
+            welcome_text += "Use the buttons below or `/help` to see all admin commands."
+        else:
+            welcome_text += "Use the buttons below to check wallets or terms of service."
         
         # Build interactive inline buttons
         if owner_active:
