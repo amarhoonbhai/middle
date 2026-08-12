@@ -186,21 +186,25 @@ async def get_invite_link(client: TelegramClient, chat_entity: Any) -> Optional[
     """Generates and returns an invite link for a legacy group or channel."""
     from telethon.tl.functions.messages import ExportChatInviteRequest
     try:
-        peer = await client.get_input_entity(chat_entity)
-        if isinstance(peer, types.InputPeerChat):
-            res = await call_with_retry(client, ExportChatInviteRequest(chat_id=peer.chat_id))
-            return res.link
-        elif isinstance(peer, types.InputPeerChannel):
+        # Retrieve the peer ID from the entity safely
+        chat_id = utils.get_peer_id(chat_entity)
+        
+        # Check if this represents a supergroup / channel
+        is_channel = False
+        if isinstance(chat_entity, (types.InputPeerChannel, types.PeerChannel, types.Channel)):
+            is_channel = True
+        elif isinstance(chat_id, int) and str(chat_id).startswith("-100"):
+            is_channel = True
+            
+        if is_channel:
             from telethon.tl.functions.channels import ExportInviteRequest
+            peer = await client.get_input_entity(chat_id)
             res = await call_with_retry(client, ExportInviteRequest(channel=peer))
             return res.link
         else:
-            chat_id = utils.get_peer_id(chat_entity)
-            if str(chat_id).startswith("-100"):
-                from telethon.tl.functions.channels import ExportInviteRequest
-                res = await call_with_retry(client, ExportInviteRequest(channel=chat_entity))
-            else:
-                res = await call_with_retry(client, ExportChatInviteRequest(chat_id=abs(chat_id)))
+            # Positive legacy chat ID
+            legacy_id = abs(chat_id) if isinstance(chat_id, int) else chat_id
+            res = await call_with_retry(client, ExportChatInviteRequest(chat_id=legacy_id))
             return res.link
     except Exception as e:
         logger.error(f"Failed to export invite link: {e}")

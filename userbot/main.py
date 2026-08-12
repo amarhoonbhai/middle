@@ -47,6 +47,13 @@ async def start_bot() -> None:
     logger.info("Starting Telegram Bot daemon flow...")
     await client.start(bot_token=config.BOT_TOKEN)
     
+    # Pre-populate bot entity cache by fetching dialogs
+    logger.info("Caching bot dialogs...")
+    try:
+        await client.get_dialogs()
+    except Exception as gde:
+        logger.warning(f"Could not fetch bot dialogs on startup: {gde}")
+    
     # Register Bot commands in Telegram Menu
     try:
         from telethon.tl.functions.bots import SetBotCommandsRequest

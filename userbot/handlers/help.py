@@ -1,6 +1,7 @@
 import os
 import logging
 from telethon import TelegramClient, events, Button
+from telethon.tl.types import ReplyKeyboardMarkup, KeyboardButtonRow, KeyboardButton
 from userbot.services.permissions import owner_command, is_owner
 from userbot.services import group_service
 
@@ -62,7 +63,7 @@ def register_help_handlers(client: TelegramClient, db) -> None:
         else:
             welcome_text += "Use the buttons below to check wallets or terms of service."
         
-        # Build interactive inline buttons
+        # Build interactive inline buttons and persistent bottom menu
         if owner_active:
             buttons = [
                 [
@@ -75,11 +76,22 @@ def register_help_handlers(client: TelegramClient, db) -> None:
             ]
             
             # Bottom persistent reply keyboard buttons for Owner
-            reply_keyboard = [
-                [Button.text("🔗 Join Group"), Button.text("📜 Terms of Service")],
-                [Button.text("💰 Escrow Wallets"), Button.text("📊 Bot Stats")],
-                [Button.text("⚙️ Settings")]
-            ]
+            reply_keyboard = ReplyKeyboardMarkup(
+                rows=[
+                    KeyboardButtonRow(buttons=[
+                        KeyboardButton(text="🔗 Join Group"),
+                        KeyboardButton(text="📜 Terms of Service")
+                    ]),
+                    KeyboardButtonRow(buttons=[
+                        KeyboardButton(text="💰 Escrow Wallets"),
+                        KeyboardButton(text="📊 Bot Stats")
+                    ]),
+                    KeyboardButtonRow(buttons=[
+                        KeyboardButton(text="⚙️ Settings")
+                    ])
+                ],
+                resize=True
+            )
         else:
             buttons = [
                 [
@@ -91,10 +103,18 @@ def register_help_handlers(client: TelegramClient, db) -> None:
             ]
             
             # Bottom persistent reply keyboard buttons for General Users
-            reply_keyboard = [
-                [Button.text("🔗 Join Group"), Button.text("📜 Terms of Service")],
-                [Button.text("💰 Escrow Wallets")]
-            ]
+            reply_keyboard = ReplyKeyboardMarkup(
+                rows=[
+                    KeyboardButtonRow(buttons=[
+                        KeyboardButton(text="🔗 Join Group"),
+                        KeyboardButton(text="📜 Terms of Service")
+                    ]),
+                    KeyboardButtonRow(buttons=[
+                        KeyboardButton(text="💰 Escrow Wallets")
+                    ])
+                ],
+                resize=True
+            )
         
         try:
             await event.respond(welcome_text, buttons=buttons)
@@ -103,7 +123,7 @@ def register_help_handlers(client: TelegramClient, db) -> None:
             
         # Send persistent bottom menu
         try:
-            await event.respond("⌨️ Quick menu:", buttons=reply_keyboard, resize_keyboard=True)
+            await event.respond("⌨️ Quick menu:", buttons=reply_keyboard)
         except Exception as e:
             logger.warning(f"Could not send reply keyboard: {e}")
 
