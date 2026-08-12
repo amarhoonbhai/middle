@@ -6,11 +6,10 @@ from userbot.utils.helpers import format_currency, parse_decimal
 
 def register_fee_handlers(client: TelegramClient, db) -> None:
     @client.on(events.NewMessage(pattern=r'^[./]fee(?:\s+(.+))?$'))
-    @owner_command(db)
     async def fee_command(event: events.NewMessage.Event) -> None:
         args = event.pattern_match.group(1)
         if not args:
-            await event.respond("❌ **Usage**: `.fee <amount>` (e.g., `.fee 1000`)")
+            await event.respond("❌ **Usage**: `/fee <amount>` (e.g., `/fee 1000`)")
             return
             
         amount = parse_decimal(args)

@@ -34,14 +34,13 @@ def register_deal_handlers(client: TelegramClient, db) -> None:
         await event.respond(response)
 
     @client.on(events.NewMessage(pattern=r'^[./]tos$'))
-    @owner_command(db)
     async def tos_command(event: events.NewMessage.Event) -> None:
         deal = await db.get_deal(event.chat_id)
         settings = await db.get_settings()
         tos_text = settings.get("tos_text")
         
         if not tos_text:
-            await event.respond("❌ **TOS is not configured.**\nUse `.settos <text>` to configure it.")
+            await event.respond("❌ **TOS is not configured.**\nUse `/settos <text>` to configure it.")
             return
             
         if deal:

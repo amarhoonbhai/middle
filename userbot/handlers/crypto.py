@@ -8,32 +8,29 @@ from userbot.utils.helpers import (
 
 def register_crypto_handlers(client: TelegramClient, db) -> None:
     @client.on(events.NewMessage(pattern=r'^[./]btc$'))
-    @owner_command(db)
     async def btc_command(event: events.NewMessage.Event) -> None:
         settings = await db.get_settings()
         addr = settings.get("btc_address")
         if not addr:
-            await event.respond("❌ **BTC Address is not configured.**\nUse `.setbtc <address>` to set it.")
+            await event.respond("❌ **BTC Address is not configured.**\nUse `/setbtc <address>` to set it.")
             return
         await event.respond(f"**BTC Address**\n\n`{addr}`\n\nNetwork: Bitcoin")
 
     @client.on(events.NewMessage(pattern=r'^[./]eth$'))
-    @owner_command(db)
     async def eth_command(event: events.NewMessage.Event) -> None:
         settings = await db.get_settings()
         addr = settings.get("eth_address")
         if not addr:
-            await event.respond("❌ **ETH Address is not configured.**\nUse `.seteth <address>` to set it.")
+            await event.respond("❌ **ETH Address is not configured.**\nUse `/seteth <address>` to set it.")
             return
         await event.respond(f"**ETH Address**\n\n`{addr}`\n\nNetwork: Ethereum (ERC-20)")
 
     @client.on(events.NewMessage(pattern=r'^[./]ltc$'))
-    @owner_command(db)
     async def ltc_command(event: events.NewMessage.Event) -> None:
         settings = await db.get_settings()
         addr = settings.get("ltc_address")
         if not addr:
-            await event.respond("❌ **LTC Address is not configured.**\nUse `.setltc <address>` to set it.")
+            await event.respond("❌ **LTC Address is not configured.**\nUse `/setltc <address>` to set it.")
             return
         await event.respond(f"**LTC Address**\n\n`{addr}`\n\nNetwork: Litecoin")
 
