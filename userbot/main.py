@@ -29,7 +29,15 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout)
     ]
 )
-logger = logging.getLogger("userbot.main")
+def get_telegram_client(session_name: str) -> TelegramClient:
+    """Initializes TelegramClient with SOCKS5 Proxy if configured in the environment."""
+    if config.PROXY_IP and config.PROXY_PORT:
+        import socks
+        proxy = (socks.SOCKS5, config.PROXY_IP, config.PROXY_PORT, True, config.PROXY_USER, config.PROXY_PASS)
+        logger.info(f"Initializing TelegramClient with SOCKS5 Proxy ({config.PROXY_IP}:{config.PROXY_PORT})...")
+        return TelegramClient(session_name, config.API_ID, config.API_HASH, proxy=proxy)
+    else:
+        return TelegramClient(session_name, config.API_ID, config.API_HASH)
 
 # --- Session Management Helpers ---
 
@@ -128,7 +136,7 @@ async def manage_accounts_menu() -> None:
             print("Follow the prompts in this terminal to authorize.")
             print("-" * 40)
             try:
-                client = TelegramClient(name, config.API_ID, config.API_HASH)
+                client = get_telegram_client(name)
                 await client.start()
                 me = await client.get_me()
                 client.me_id = me.id
@@ -215,7 +223,7 @@ async def interactive_menu(db: Database) -> None:
             print("To stop the bot, press Ctrl+C.")
             print("-" * 40)
             
-            client = TelegramClient(active_sess, config.API_ID, config.API_HASH)
+            client = get_telegram_client(active_sess)
             register_all_handlers(client, db)
             
             await client.start()
@@ -394,7 +402,7 @@ async def run_cli() -> None:
     if args.command == "start":
         logger.info("Initializing SQLite database...")
         logger.info(f"Initializing Telegram client (Session: {active_sess})...")
-        client = TelegramClient(active_sess, config.API_ID, config.API_HASH)
+        client = get_telegram_client(active_sess)
         register_all_handlers(client, db)
         
         logger.info("Starting Telegram Client login flow...")

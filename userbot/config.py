@@ -19,6 +19,13 @@ class Config:
             except ValueError:
                 raise ValueError(f"Configuration error: 'OWNER_ID' must be a valid integer. Got: '{owner_id_str}'")
 
+        # Optional Proxy Configurations
+        self.PROXY_IP = os.getenv("PROXY_IP")
+        proxy_port_str = os.getenv("PROXY_PORT")
+        self.PROXY_PORT = int(proxy_port_str) if proxy_port_str and proxy_port_str.strip() else None
+        self.PROXY_USER = os.getenv("PROXY_USER")
+        self.PROXY_PASS = os.getenv("PROXY_PASS")
+
     def _get_required_str(self, var_name: str) -> str:
         val = os.getenv(var_name)
         if not val or not val.strip():
