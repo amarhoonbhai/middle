@@ -7,37 +7,33 @@ from userbot.services import group_service
 
 logger = logging.getLogger(__name__)
 
-def register_help_handlers(client: TelegramClient, db) -> None:
+def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False) -> None:
     
-    @client.on(events.NewMessage(pattern=r'^[./]help'))
-    @owner_command(db)
-    async def help_command(event: events.NewMessage.Event) -> None:
-        help_text = (
-            "ℹ️ **Spinify Escrow Commands**\n\n"
-            "**Escrow Commands**\n"
-            "• `/mm @buyer @seller` - Register daily deal\n"
-            "• `/setgroup` - Set current group as daily room\n"
-            "• `/close` - Close current deal\n"
-            "• `/name <title>` - Rename current group\n"
-            "• `/fee <amount>` - Calculate transaction fee\n"
-            "• `/rec` - Mark funds as received\n"
-            "• `/tos` - View Terms of Service\n\n"
-            "**Crypto Addresses**\n"
-            "• `/btc` - View BTC address\n"
-            "• `/eth` - View ETH address\n"
-            "• `/ltc` - View LTC address\n\n"
-            "**Settings (Owner Only)**\n"
-            "• `/settings` - View current configuration\n"
-            "• `/setfee <%>` - Set default fee percentage\n"
-            "• `/setminfee <val>` - Set minimum fee amount\n"
-            "• `/setbtc <addr>` - Set BTC wallet address\n"
-            "• `/seteth <addr>` - Set ETH wallet address\n"
-            "• `/setltc <addr>` - Set LTC wallet address\n"
-            "• `/settos <text>` - Set Terms of Service text\n"
-            "• `/block` - Block user (reply to their message)\n\n"
-            "*(Commands support both / and . prefixes)*"
-        )
-        await event.respond(help_text)
+    if is_userbot:
+        @client.on(events.NewMessage(pattern=r'^\.help'))
+        @owner_command(db)
+        async def help_command(event: events.NewMessage.Event) -> None:
+            help_text = (
+                "ℹ️ **Spinify Escrow Userbot Commands**\n\n"
+                "• `.mm @buyer @seller` - Register daily deal\n"
+                "• `.setgroup` - Set current group as daily room\n"
+                "• `.close` - Close current deal\n"
+                "• `.name <title>` - Rename current group\n"
+                "• `.fee <amount>` - Calculate transaction fee\n"
+                "• `.rec` - Mark funds as received\n"
+                "• `.tos` - View Terms of Service\n"
+                "• `.btc` / `.eth` / `.ltc` - View crypto addresses\n"
+                "• `.settings` - View current configuration\n"
+                "• `.setfee <%>` - Set default fee percentage\n"
+                "• `.setminfee <val>` - Set minimum fee amount\n"
+                "• `.setbtc <addr>` - Set BTC wallet address\n"
+                "• `.seteth <addr>` - Set ETH wallet address\n"
+                "• `.setltc <addr>` - Set LTC wallet address\n"
+                "• `.settos <text>` - Set Terms of Service text\n"
+                "• `.block` - Block user (reply to their message)"
+            )
+            await event.respond(help_text)
+        return
 
     @client.on(events.NewMessage(pattern=r'^[./]start$'))
     async def start_command(event: events.NewMessage.Event) -> None:

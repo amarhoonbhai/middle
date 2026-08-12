@@ -4,12 +4,15 @@ from userbot.services.permissions import owner_command
 from userbot.services.fee_service import calculate_fee
 from userbot.utils.helpers import format_currency, parse_decimal
 
-def register_fee_handlers(client: TelegramClient, db) -> None:
-    @client.on(events.NewMessage(pattern=r'^[./]fee(?:\s+(.+))?$'))
+def register_fee_handlers(client: TelegramClient, db, is_userbot: bool = False) -> None:
+    if not is_userbot:
+        return
+        
+    @client.on(events.NewMessage(pattern=r'^\.fee(?:\s+(.+))?$'))
     async def fee_command(event: events.NewMessage.Event) -> None:
         args = event.pattern_match.group(1)
         if not args:
-            await event.respond("❌ **Usage**: `/fee <amount>` (e.g., `/fee 1000`)")
+            await event.respond("❌ **Usage**: `.fee <amount>` (e.g., `.fee 1000`)")
             return
             
         amount = parse_decimal(args)
@@ -31,7 +34,7 @@ def register_fee_handlers(client: TelegramClient, db) -> None:
         )
         await event.respond(response)
 
-    @client.on(events.NewMessage(pattern=r'^[./]setfee(?:\s+(.+))?$'))
+    @client.on(events.NewMessage(pattern=r'^\.setfee(?:\s+(.+))?$'))
     @owner_command(db)
     async def setfee_command(event: events.NewMessage.Event) -> None:
         args = event.pattern_match.group(1)
@@ -47,7 +50,7 @@ def register_fee_handlers(client: TelegramClient, db) -> None:
         await db.update_settings(fee_percentage=str(fee_pct))
         await event.respond(f"✅ **Success**: Default MM fee percentage updated to **{fee_pct}%**.")
 
-    @client.on(events.NewMessage(pattern=r'^[./]setminfee(?:\s+(.+))?$'))
+    @client.on(events.NewMessage(pattern=r'^\.setminfee(?:\s+(.+))?$'))
     @owner_command(db)
     async def setminfee_command(event: events.NewMessage.Event) -> None:
         args = event.pattern_match.group(1)

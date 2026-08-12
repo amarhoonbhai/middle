@@ -1,8 +1,11 @@
 from telethon import TelegramClient, events
 from userbot.services.permissions import owner_command
 
-def register_deal_handlers(client: TelegramClient, db) -> None:
-    @client.on(events.NewMessage(pattern=r'^[./]rec$'))
+def register_deal_handlers(client: TelegramClient, db, is_userbot: bool = False) -> None:
+    if not is_userbot:
+        return
+        
+    @client.on(events.NewMessage(pattern=r'^\.rec$'))
     @owner_command(db)
     async def rec_command(event: events.NewMessage.Event) -> None:
         chat_id = event.chat_id
@@ -33,14 +36,14 @@ def register_deal_handlers(client: TelegramClient, db) -> None:
         )
         await event.respond(response)
 
-    @client.on(events.NewMessage(pattern=r'^[./]tos$'))
+    @client.on(events.NewMessage(pattern=r'^\.tos$'))
     async def tos_command(event: events.NewMessage.Event) -> None:
         deal = await db.get_deal(event.chat_id)
         settings = await db.get_settings()
         tos_text = settings.get("tos_text")
         
         if not tos_text:
-            await event.respond("❌ **TOS is not configured.**\nUse `/settos <text>` to configure it.")
+            await event.respond("❌ **TOS is not configured.**\nUse `.settos <text>` to configure it.")
             return
             
         if deal:
@@ -51,7 +54,7 @@ def register_deal_handlers(client: TelegramClient, db) -> None:
             
         await event.respond(f"{prefix}{tos_text}")
 
-    @client.on(events.NewMessage(pattern=r'^[./]settos(?:\s+([\s\S]+))?$'))
+    @client.on(events.NewMessage(pattern=r'^\.settos(?:\s+([\s\S]+))?$'))
     @owner_command(db)
     async def settos_command(event: events.NewMessage.Event) -> None:
         tos_text = None

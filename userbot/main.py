@@ -42,7 +42,7 @@ async def start_bot() -> None:
     
     logger.info("Initializing Telegram client (Session: bot_session)...")
     client = get_telegram_client("bot_session")
-    register_all_handlers(client, db)
+    register_all_handlers(client, db, is_userbot=False)
     
     logger.info("Starting Telegram Bot daemon flow...")
     await client.start(bot_token=config.BOT_TOKEN)
@@ -57,6 +57,7 @@ async def start_bot() -> None:
             if await user_client.is_user_authorized():
                 logger.info("Userbot client is authorized! Starting userbot client daemon...")
                 await user_client.start()
+                register_all_handlers(user_client, db, is_userbot=True)
                 client.user_client = user_client
             else:
                 logger.info("Userbot client session found but not authorized. Disconnecting userbot client.")

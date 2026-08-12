@@ -8,12 +8,12 @@ from userbot.handlers.deals import register_deal_handlers
 from userbot.handlers.groups import register_group_handlers
 from userbot.handlers.moderation import register_moderation_handlers
 
-def register_all_handlers(client: TelegramClient, db: Database) -> None:
+def register_all_handlers(client: TelegramClient, db: Database, is_userbot: bool = False) -> None:
     """Registers all command handlers onto the given Telethon client."""
-    register_help_handlers(client, db)
-    register_settings_handlers(client, db)
-    register_fee_handlers(client, db)
-    register_crypto_handlers(client, db)
-    register_deal_handlers(client, db)
-    register_group_handlers(client, db)
-    register_moderation_handlers(client, db)
+    register_help_handlers(client, db, is_userbot)
+    register_settings_handlers(client, db, is_userbot)
+    register_fee_handlers(client, db, is_userbot)
+    register_crypto_handlers(client, db, is_userbot)
+    register_deal_handlers(client, db, is_userbot)
+    register_group_handlers(client, db, is_userbot)
+    register_moderation_handlers(client, db, is_userbot)

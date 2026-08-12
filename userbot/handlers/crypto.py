@@ -6,7 +6,10 @@ from userbot.utils.helpers import (
     validate_ltc_address
 )
 
-def register_crypto_handlers(client: TelegramClient, db) -> None:
+def register_crypto_handlers(client: TelegramClient, db, is_userbot: bool = False) -> None:
+    if not is_userbot:
+        return
+        
     async def _get_deal_amount_suffix(chat_id: int) -> str:
         """Helper to get a detailed transaction summary suffix if an active deal has an amount set."""
         deal = await db.get_deal(chat_id)
@@ -24,37 +27,37 @@ def register_crypto_handlers(client: TelegramClient, db) -> None:
                 )
         return ""
 
-    @client.on(events.NewMessage(pattern=r'^[./]btc$'))
+    @client.on(events.NewMessage(pattern=r'^\.btc$'))
     async def btc_command(event: events.NewMessage.Event) -> None:
         settings = await db.get_settings()
         addr = settings.get("btc_address")
         if not addr:
-            await event.respond("❌ **BTC Address is not configured.**\nUse `/setbtc <address>` to set it.")
+            await event.respond("❌ **BTC Address is not configured.**\nUse `.setbtc <address>` to set it.")
             return
         suffix = await _get_deal_amount_suffix(event.chat_id)
         await event.respond(f"💰 **BTC Payout Address**\n\n`{addr}`\n\nNetwork: Bitcoin{suffix}")
 
-    @client.on(events.NewMessage(pattern=r'^[./]eth$'))
+    @client.on(events.NewMessage(pattern=r'^\.eth$'))
     async def eth_command(event: events.NewMessage.Event) -> None:
         settings = await db.get_settings()
         addr = settings.get("eth_address")
         if not addr:
-            await event.respond("❌ **ETH Address is not configured.**\nUse `/seteth <address>` to set it.")
+            await event.respond("❌ **ETH Address is not configured.**\nUse `.seteth <address>` to set it.")
             return
         suffix = await _get_deal_amount_suffix(event.chat_id)
         await event.respond(f"💰 **ETH Payout Address**\n\n`{addr}`\n\nNetwork: Ethereum (ERC-20){suffix}")
 
-    @client.on(events.NewMessage(pattern=r'^[./]ltc$'))
+    @client.on(events.NewMessage(pattern=r'^\.ltc$'))
     async def ltc_command(event: events.NewMessage.Event) -> None:
         settings = await db.get_settings()
         addr = settings.get("ltc_address")
         if not addr:
-            await event.respond("❌ **LTC Address is not configured.**\nUse `/setltc <address>` to set it.")
+            await event.respond("❌ **LTC Address is not configured.**\nUse `.setltc <address>` to set it.")
             return
         suffix = await _get_deal_amount_suffix(event.chat_id)
         await event.respond(f"💰 **LTC Payout Address**\n\n`{addr}`\n\nNetwork: Litecoin{suffix}")
 
-    @client.on(events.NewMessage(pattern=r'^[./]setbtc(?:\s+(.+))?$'))
+    @client.on(events.NewMessage(pattern=r'^\.setbtc(?:\s+(.+))?$'))
     @owner_command(db)
     async def setbtc_command(event: events.NewMessage.Event) -> None:
         addr = event.pattern_match.group(1)
@@ -68,7 +71,7 @@ def register_crypto_handlers(client: TelegramClient, db) -> None:
         await db.update_settings(btc_address=addr)
         await event.respond(f"✅ **Success**: BTC address updated to:\n`{addr}`")
 
-    @client.on(events.NewMessage(pattern=r'^[./]seteth(?:\s+(.+))?$'))
+    @client.on(events.NewMessage(pattern=r'^\.seteth(?:\s+(.+))?$'))
     @owner_command(db)
     async def seteth_command(event: events.NewMessage.Event) -> None:
         addr = event.pattern_match.group(1)
@@ -82,7 +85,7 @@ def register_crypto_handlers(client: TelegramClient, db) -> None:
         await db.update_settings(eth_address=addr)
         await event.respond(f"✅ **Success**: ETH address updated to:\n`{addr}`")
 
-    @client.on(events.NewMessage(pattern=r'^[./]setltc(?:\s+(.+))?$'))
+    @client.on(events.NewMessage(pattern=r'^\.setltc(?:\s+(.+))?$'))
     @owner_command(db)
     async def setltc_command(event: events.NewMessage.Event) -> None:
         addr = event.pattern_match.group(1)

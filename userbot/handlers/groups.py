@@ -22,8 +22,11 @@ async def get_active_client(client: TelegramClient) -> TelegramClient:
             pass
     return client
 
-def register_group_handlers(client: TelegramClient, db) -> None:
-    @client.on(events.NewMessage(pattern=r'^[./]mm(?:\s+(.+))?$'))
+def register_group_handlers(client: TelegramClient, db, is_userbot: bool = False) -> None:
+    if not is_userbot:
+        return
+        
+    @client.on(events.NewMessage(pattern=r'^\.mm(?:\s+(.+))?$'))
     @owner_command(db)
     async def mm_command(event: events.NewMessage.Event) -> None:
         args = event.pattern_match.group(1)
@@ -290,7 +293,7 @@ def register_group_handlers(client: TelegramClient, db) -> None:
             
         await event.respond(response_text)
 
-    @client.on(events.NewMessage(pattern=r'^[./]name(?:\s+(.+))?$'))
+    @client.on(events.NewMessage(pattern=r'^\.name(?:\s+(.+))?$'))
     @owner_command(db)
     async def name_command(event: events.NewMessage.Event) -> None:
         chat_id = event.chat_id
@@ -319,7 +322,7 @@ def register_group_handlers(client: TelegramClient, db) -> None:
         
         await event.respond(f"✅ **Group renamed to**: {new_title}")
 
-    @client.on(events.NewMessage(pattern=r'^[./]close(?:\s+(.+))?$'))
+    @client.on(events.NewMessage(pattern=r'^\.close(?:\s+(.+))?$'))
     @owner_command(db)
     async def close_command(event: events.NewMessage.Event) -> None:
         chat_id = event.chat_id
@@ -383,7 +386,7 @@ def register_group_handlers(client: TelegramClient, db) -> None:
             if kicked_users:
                 await event.respond(f"🧹 **Cleaned up daily room**: Removed participants: {', '.join(kicked_users)}")
 
-    @client.on(events.NewMessage(pattern=r'^[./]setgroup$'))
+    @client.on(events.NewMessage(pattern=r'^\.setgroup$'))
     @owner_command(db)
     async def setgroup_command(event: events.NewMessage.Event) -> None:
         """Manually registers the current group chat as today's active daily room."""
@@ -403,7 +406,7 @@ def register_group_handlers(client: TelegramClient, db) -> None:
             f"• **Chat ID**: `{chat_id}`"
         )
 
-    @client.on(events.NewMessage(pattern=r'^[./]setamount(?:\s+(.+))?$'))
+    @client.on(events.NewMessage(pattern=r'^\.setamount(?:\s+(.+))?$'))
     @owner_command(db)
     async def setamount_command(event: events.NewMessage.Event) -> None:
         """Sets the transaction amount and calculates the fee for the active deal in this chat."""
@@ -448,7 +451,7 @@ def register_group_handlers(client: TelegramClient, db) -> None:
         )
         await event.respond(response)
 
-    @client.on(events.NewMessage(pattern=r'^[./]status$'))
+    @client.on(events.NewMessage(pattern=r'^\.status$'))
     async def status_command(event: events.NewMessage.Event) -> None:
         """Displays the details and payment status of the active deal in this chat."""
         chat_id = event.chat_id
