@@ -7,6 +7,23 @@ from userbot.utils.helpers import (
 )
 
 def register_crypto_handlers(client: TelegramClient, db) -> None:
+    async def _get_deal_amount_suffix(chat_id: int) -> str:
+        """Helper to get a detailed transaction summary suffix if an active deal has an amount set."""
+        deal = await db.get_deal(chat_id)
+        if deal:
+            from userbot.utils.helpers import parse_decimal, format_currency
+            amount = parse_decimal(deal.get("amount") or "0.00") or 0
+            fee = parse_decimal(deal.get("fee") or "0.00") or 0
+            if amount > 0:
+                total = amount + fee
+                return (
+                    f"\n\n**Escrow Deal Info:**\n"
+                    f"• **Amount**: {format_currency(amount)}\n"
+                    f"• **Escrow Fee**: {format_currency(fee)}\n"
+                    f"• **Total Expected Deposit**: `{format_currency(total)}`"
+                )
+        return ""
+
     @client.on(events.NewMessage(pattern=r'^[./]btc$'))
     async def btc_command(event: events.NewMessage.Event) -> None:
         settings = await db.get_settings()
@@ -14,7 +31,8 @@ def register_crypto_handlers(client: TelegramClient, db) -> None:
         if not addr:
             await event.respond("❌ **BTC Address is not configured.**\nUse `/setbtc <address>` to set it.")
             return
-        await event.respond(f"**BTC Address**\n\n`{addr}`\n\nNetwork: Bitcoin")
+        suffix = await _get_deal_amount_suffix(event.chat_id)
+        await event.respond(f"💰 **BTC Payout Address**\n\n`{addr}`\n\nNetwork: Bitcoin{suffix}")
 
     @client.on(events.NewMessage(pattern=r'^[./]eth$'))
     async def eth_command(event: events.NewMessage.Event) -> None:
@@ -23,7 +41,8 @@ def register_crypto_handlers(client: TelegramClient, db) -> None:
         if not addr:
             await event.respond("❌ **ETH Address is not configured.**\nUse `/seteth <address>` to set it.")
             return
-        await event.respond(f"**ETH Address**\n\n`{addr}`\n\nNetwork: Ethereum (ERC-20)")
+        suffix = await _get_deal_amount_suffix(event.chat_id)
+        await event.respond(f"💰 **ETH Payout Address**\n\n`{addr}`\n\nNetwork: Ethereum (ERC-20){suffix}")
 
     @client.on(events.NewMessage(pattern=r'^[./]ltc$'))
     async def ltc_command(event: events.NewMessage.Event) -> None:
@@ -32,7 +51,8 @@ def register_crypto_handlers(client: TelegramClient, db) -> None:
         if not addr:
             await event.respond("❌ **LTC Address is not configured.**\nUse `/setltc <address>` to set it.")
             return
-        await event.respond(f"**LTC Address**\n\n`{addr}`\n\nNetwork: Litecoin")
+        suffix = await _get_deal_amount_suffix(event.chat_id)
+        await event.respond(f"💰 **LTC Payout Address**\n\n`{addr}`\n\nNetwork: Litecoin{suffix}")
 
     @client.on(events.NewMessage(pattern=r'^[./]setbtc(?:\s+(.+))?$'))
     @owner_command(db)

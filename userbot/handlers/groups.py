@@ -382,3 +382,88 @@ def register_group_handlers(client: TelegramClient, db) -> None:
             f"• **Date**: {today_str}\n"
             f"• **Chat ID**: `{chat_id}`"
         )
+
+    @client.on(events.NewMessage(pattern=r'^[./]setamount(?:\s+(.+))?$'))
+    @owner_command(db)
+    async def setamount_command(event: events.NewMessage.Event) -> None:
+        """Sets the transaction amount and calculates the fee for the active deal in this chat."""
+        chat_id = event.chat_id
+        deal = await db.get_deal(chat_id)
+        if not deal:
+            await event.respond("❌ **Error**: This command must be executed inside an active MM group.")
+            return
+            
+        args = event.pattern_match.group(1)
+        if not args:
+            await event.respond("❌ **Usage**: `/setamount <number>` (e.g. `/setamount 1500`)")
+            return
+            
+        from userbot.utils.helpers import parse_decimal, format_currency
+        amount = parse_decimal(args)
+        if amount is None or amount <= 0:
+            await event.respond("❌ **Error**: Please provide a valid positive numeric amount.")
+            return
+            
+        # Fetch configurations to calculate fee
+        settings = await db.get_settings()
+        from decimal import Decimal
+        from userbot.services.fee_service import calculate_fee
+        fee_pct = Decimal(settings.get("fee_percentage", "3.0"))
+        min_fee = Decimal(settings.get("min_fee", "0.0"))
+        
+        fee, total = calculate_fee(amount, fee_pct, min_fee)
+        
+        deal_id = deal["deal_id"]
+        formatted_deal_id = f"{deal_id:04d}"
+        
+        # Save to database
+        await db.update_deal(deal_id, amount=str(amount), fee=str(fee))
+        await db.log_deal_event(deal_id, "amount_set", f"Owner set deal amount to {amount} (fee: {fee})")
+        
+        response = (
+            f"✅ **Deal Amount Configured - #{formatted_deal_id}**\n\n"
+            f"• **Amount**: {format_currency(amount)}\n"
+            f"• **Escrow Fee ({fee_pct}%)**: {format_currency(fee)}\n"
+            f"• **Total Deposit Expected**: {format_currency(total)}"
+        )
+        await event.respond(response)
+
+    @client.on(events.NewMessage(pattern=r'^[./]status$'))
+    async def status_command(event: events.NewMessage.Event) -> None:
+        """Displays the details and payment status of the active deal in this chat."""
+        chat_id = event.chat_id
+        deal = await db.get_deal(chat_id)
+        if not deal:
+            await event.respond("❌ **Error**: No active deal found in this chat room.")
+            return
+            
+        deal_id = deal["deal_id"]
+        formatted_deal_id = f"{deal_id:04d}"
+        
+        # Parse status variables
+        from userbot.utils.helpers import parse_decimal, format_currency
+        amount = parse_decimal(deal.get("amount") or "0.00") or 0
+        fee = parse_decimal(deal.get("fee") or "0.00") or 0
+        total = amount + fee
+        
+        funds_confirmed = "✅ Confirmed" if deal.get("funds_received") else "❌ Pending"
+        
+        import json
+        participants_text = "None"
+        participants_data = deal.get("participants")
+        if participants_data:
+            try:
+                p_list = json.loads(participants_data)
+                participants_text = ", ".join(p_list)
+            except Exception:
+                participants_text = str(participants_data)
+                
+        response = (
+            f"ℹ️ **Deal Status - #{formatted_deal_id}**\n\n"
+            f"• **Participants**: {participants_text}\n"
+            f"• **Deal Amount**: {format_currency(amount)}\n"
+            f"• **Escrow Fee**: {format_currency(fee)}\n"
+            f"• **Total Expected**: {format_currency(total)}\n"
+            f"• **Payment Status**: {funds_confirmed}"
+        )
+        await event.respond(response)
