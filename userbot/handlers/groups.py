@@ -382,27 +382,50 @@ def register_group_handlers(client: TelegramClient, db, is_userbot: bool = False
                                     logger.warning(f"Could not kick participant {p}: {ke}")
                 except Exception as pe:
                     logger.error(f"Failed to parse participants JSON to kick: {pe}")
-            
             if kicked_users:
                 await event.respond(f"🧹 **Cleaned up daily room**: Removed participants: {', '.join(kicked_users)}")
 
-    @client.on(events.NewMessage(pattern=r'^\.setgroup$'))
+    @client.on(events.NewMessage(pattern=r'^\.setgroup(?:\s+(.+))?$'))
     @owner_command(db)
     async def setgroup_command(event: events.NewMessage.Event) -> None:
-        """Manually registers the current group chat as today's active daily room."""
-        if not event.is_group:
-            await event.respond("❌ **Error**: This command must be executed inside a group chat.")
-            return
-            
-        chat_id = event.chat_id
+        """Manually registers a group chat as today's active daily room.
+        Can be run inside the group (no args) or from DM with a group ID or link."""
+        args = event.pattern_match.group(1)
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        
+        chat_id = None
+
+        if args:
+            # Owner provided a group ID or invite link from DM
+            arg = args.strip()
+            # Support plain negative IDs like -1001234567890 or just the number
+            if arg.lstrip("-").isdigit():
+                chat_id = int(arg)
+            else:
+                # Try to resolve username or t.me link
+                try:
+                    active_client = await get_active_client(client)
+                    entity = await active_client.get_entity(arg)
+                    from telethon import utils
+                    chat_id = utils.get_peer_id(entity)
+                except Exception as e:
+                    await event.respond(f"❌ **Error**: Could not resolve group from `{arg}`.\n\n{e}")
+                    return
+        elif event.is_group:
+            chat_id = event.chat_id
+        else:
+            await event.respond(
+                "❌ **Error**: Run this command inside a group, or provide a group ID/link:\n\n"
+                "`.setgroup -1001234567890`\n"
+                "`.setgroup https://t.me/joinchat/...`"
+            )
+            return
+
         # Save daily group info in database settings
         await db.update_settings(daily_group_id=chat_id, daily_group_date=today_str)
-        
+
         await event.respond(
-            f"✅ **Success**: This group has been manually registered as today's active daily room!\n"
-            f"• **Date**: {today_str}\n"
+            f"✅ **Success**: Group registered as today's active daily room!\n"
+            f"• **Date**: `{today_str}`\n"
             f"• **Chat ID**: `{chat_id}`"
         )
 

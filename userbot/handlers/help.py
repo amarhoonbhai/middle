@@ -232,10 +232,15 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
             if not await is_owner(event.sender_id, db):
                 await event.reply("❌ **Access Denied**: Only the Middleman Owner can set escrow groups.")
             else:
+                from userbot.handlers.settings import login_state
+                login_state["step"] = "awaiting_group"
                 await event.reply(
-                    "🏠 **Set Escrow Group Chat**\n\n"
-                    "To manually register any group chat as today's active daily room, navigate to that group and type:\n"
-                    "`.setgroup`"
+                    "🏠 **Set Escrow Group**\n\n"
+                    "Please send the **Group ID** or **invite link** of the group you want to register as today's active escrow room.\n\n"
+                    "**Examples**:\n"
+                    "`-1001234567890`\n"
+                    "`https://t.me/joinchat/...`",
+                    buttons=[Button.inline("❌ Cancel", data="btn_cancel_login")]
                 )
 
     # --- Persistent Reply Keyboard Listeners ---
@@ -315,8 +320,14 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
     @client.on(events.NewMessage(pattern=r'^🏠 Set Escrow Group$'))
     @owner_command(db)
     async def set_escrow_group_button_handler(event: events.NewMessage.Event) -> None:
+        from userbot.handlers.settings import login_state
+        login_state["step"] = "awaiting_group"
+        from telethon import Button
         await event.respond(
-            "🏠 **Set Escrow Group Chat**\n\n"
-            "To manually register any group chat as today's active daily room, navigate to that group and type:\n"
-            "`.setgroup`"
+            "🏠 **Set Escrow Group**\n\n"
+            "Please send the **Group ID** or **invite link** of the group you want to register as today's active escrow room.\n\n"
+            "**Examples**:\n"
+            "`-1001234567890`\n"
+            "`https://t.me/joinchat/...`",
+            buttons=[Button.inline("❌ Cancel", data="btn_cancel_login")]
         )

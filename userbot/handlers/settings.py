@@ -205,6 +205,38 @@ def register_settings_handlers(client: TelegramClient, db, is_userbot: bool = Fa
             except Exception as e:
                 await event.respond(f"❌ **2FA password verification failed**: {e}\n\nPlease enter your 2FA password again:")
 
+        elif step == "awaiting_group":
+            from datetime import datetime, timezone as tz
+            today_str = datetime.now(tz.utc).strftime("%Y-%m-%d")
+            chat_id = None
+            arg = text.strip()
+
+            # Detect numeric group ID (may start with -)
+            if arg.lstrip("-").isdigit():
+                chat_id = int(arg)
+            else:
+                # Try resolving via userbot (needed for private links)
+                user_client = getattr(client, "user_client", None) or client
+                try:
+                    entity = await user_client.get_entity(arg)
+                    from telethon import utils as tu
+                    chat_id = tu.get_peer_id(entity)
+                except Exception as e:
+                    await event.respond(
+                        f"❌ **Error**: Could not resolve group from `{arg}`.\n\n"
+                        f"`{e}`\n\n"
+                        "Please make sure you provide a valid group ID (e.g. `-1001234567890`) or invite link."
+                    )
+                    return
+
+            await db.update_settings(daily_group_id=chat_id, daily_group_date=today_str)
+            login_state["step"] = None
+            await event.respond(
+                f"✅ **Success**: Group registered as today's active escrow room!\n"
+                f"• **Date**: `{today_str}`\n"
+                f"• **Chat ID**: `{chat_id}`"
+            )
+
     @client.on(events.NewMessage(pattern=r'^\.addaccount(?:\s+(.+))?$'))
     @owner_command(db)
     async def addaccount_command(event: events.NewMessage.Event) -> None:
