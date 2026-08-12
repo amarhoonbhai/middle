@@ -6,7 +6,8 @@ login_state = {
     "phone": None,
     "phone_code_hash": None,
     "client": None,
-    "step": None
+    "step": None,
+    "admin_action": None,   # "add" | "remove"
 }
 
 def get_user_client() -> TelegramClient:
@@ -236,6 +237,50 @@ def register_settings_handlers(client: TelegramClient, db, is_userbot: bool = Fa
                 f"• **Date**: `{today_str}`\n"
                 f"• **Chat ID**: `{chat_id}`"
             )
+
+        elif step == "awaiting_admin_id":
+            action = login_state.get("admin_action", "add")
+            arg = text.strip()
+
+            if not arg.isdigit():
+                await event.respond(
+                    "❌ **Invalid ID**: Please send a plain numeric Telegram User ID (e.g. `123456789`)."
+                )
+                return
+
+            target_id = int(arg)
+            login_state["step"] = None
+            login_state["admin_action"] = None
+
+            if action == "add":
+                # Try to resolve username via userbot for display
+                username = None
+                try:
+                    uc = getattr(client, "user_client", None) or client
+                    entity = await uc.get_entity(target_id)
+                    username = getattr(entity, "username", None)
+                except Exception:
+                    pass
+                await db.add_admin(target_id, username)
+                display = f"@{username}" if username else f"`{target_id}`"
+                await event.respond(
+                    f"✅ **Admin Added**\n\n"
+                    f"• **User**: {display}\n"
+                    f"• **ID**: `{target_id}`\n\n"
+                    f"This user now has full owner-level access to the bot."
+                )
+            else:  # remove
+                removed = await db.remove_admin(target_id)
+                if removed:
+                    await event.respond(
+                        f"✅ **Admin Removed**\n\n"
+                        f"• **ID**: `{target_id}` has been revoked admin access."
+                    )
+                else:
+                    await event.respond(
+                        f"❌ **Not Found**: `{target_id}` was not in the admins list."
+                    )
+
 
     @client.on(events.NewMessage(pattern=r'^\.addaccount(?:\s+(.+))?$'))
     @owner_command(db)

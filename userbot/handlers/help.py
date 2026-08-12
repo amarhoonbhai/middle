@@ -63,27 +63,30 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
         else:
             welcome_text += "\nUse the buttons below to check wallets or terms of service."
 
-        # Build inline buttons
+        # Build inline buttons — enhanced glass style
         if owner_active:
             buttons = [
                 [
-                    Button.inline("🫧 Terms of Service", data="btn_tos"),
-                    Button.inline("ℹ️ Help", data="btn_help")
+                    Button.inline("📜 Terms of Service", data="btn_tos"),
+                    Button.inline("ℹ️ Help",             data="btn_help"),
                 ],
                 [
-                    Button.inline("💎 Escrow Wallets", data="btn_crypto"),
-                    Button.inline("📊 Escrow Stats", data="btn_stats")
+                    Button.inline("💎 Wallets",    data="btn_crypto"),
+                    Button.inline("📊 Stats",       data="btn_stats"),
                 ],
                 [
-                    Button.inline("🔌 Connect Userbot", data="btn_connect_userbot"),
-                    Button.inline("🏠 Set Escrow Group", data="btn_set_escrow_group")
+                    Button.inline("🔌 Connect Userbot",  data="btn_connect_userbot"),
+                    Button.inline("🏠 Set Group",         data="btn_set_escrow_group"),
+                ],
+                [
+                    Button.inline("👑 Manage Admins", data="btn_manage_admins"),
                 ]
             ]
             reply_keyboard = ReplyKeyboardMarkup(
                 rows=[
                     KeyboardButtonRow(buttons=[
                         KeyboardButton(text="🧊 Join Group"),
-                        KeyboardButton(text="🫧 Terms of Service")
+                        KeyboardButton(text="📜 Terms of Service")
                     ]),
                     KeyboardButtonRow(buttons=[
                         KeyboardButton(text="💎 Escrow Wallets"),
@@ -94,7 +97,10 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
                         KeyboardButton(text="🏠 Set Escrow Group")
                     ]),
                     KeyboardButtonRow(buttons=[
-                        KeyboardButton(text="⚙️ Settings"),
+                        KeyboardButton(text="👑 Manage Admins"),
+                        KeyboardButton(text="⚙️ Settings")
+                    ]),
+                    KeyboardButtonRow(buttons=[
                         KeyboardButton(text="ℹ️ Help")
                     ])
                 ],
@@ -103,8 +109,8 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
         else:
             buttons = [
                 [
-                    Button.inline("🫧 Terms of Service", data="btn_tos"),
-                    Button.inline("ℹ️ Help", data="btn_help")
+                    Button.inline("📜 Terms of Service", data="btn_tos"),
+                    Button.inline("ℹ️ Help",             data="btn_help"),
                 ],
                 [
                     Button.inline("💎 Escrow Wallets", data="btn_crypto")
@@ -114,7 +120,7 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
                 rows=[
                     KeyboardButtonRow(buttons=[
                         KeyboardButton(text="🧊 Join Group"),
-                        KeyboardButton(text="🫧 Terms of Service")
+                        KeyboardButton(text="📜 Terms of Service")
                     ]),
                     KeyboardButtonRow(buttons=[
                         KeyboardButton(text="💎 Escrow Wallets"),
@@ -253,6 +259,57 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
                 login_state["step"] = None
                 await event.reply("❌ **Userbot login cancelled.**")
                 
+        elif data == "btn_manage_admins":
+            if not await is_owner(event.sender_id, db):
+                await event.reply("❌ **Access Denied**: Only the Owner can manage admins.")
+            else:
+                admins = await db.list_admins()
+                if admins:
+                    lines = [f"• `{a['user_id']}` {('@' + a['username']) if a.get('username') else ''}".strip() for a in admins]
+                    admin_list = "\n".join(lines)
+                else:
+                    admin_list = "_No secondary admins added yet._"
+                await event.reply(
+                    f"👑 **Admin Management**\n\n"
+                    f"**Current Admins**:\n{admin_list}\n\n"
+                    f"Choose an action:",
+                    buttons=[
+                        [Button.inline("➕ Add Admin",    data="btn_add_admin")],
+                        [Button.inline("➖ Remove Admin", data="btn_remove_admin")],
+                        [Button.inline("❌ Close",        data="btn_close_panel")],
+                    ]
+                )
+
+        elif data == "btn_add_admin":
+            if not await is_owner(event.sender_id, db):
+                await event.reply("❌ **Access Denied**.")
+            else:
+                from userbot.handlers.settings import login_state
+                login_state["step"] = "awaiting_admin_id"
+                login_state["admin_action"] = "add"
+                await event.reply(
+                    "➕ **Add Admin**\n\n"
+                    "Send the **Telegram User ID** of the person you want to grant admin rights to.\n"
+                    "_(You can get their ID by forwarding their message to @userinfobot)_",
+                    buttons=[Button.inline("❌ Cancel", data="btn_cancel_login")]
+                )
+
+        elif data == "btn_remove_admin":
+            if not await is_owner(event.sender_id, db):
+                await event.reply("❌ **Access Denied**.")
+            else:
+                from userbot.handlers.settings import login_state
+                login_state["step"] = "awaiting_admin_id"
+                login_state["admin_action"] = "remove"
+                await event.reply(
+                    "➖ **Remove Admin**\n\n"
+                    "Send the **Telegram User ID** of the admin you want to revoke.",
+                    buttons=[Button.inline("❌ Cancel", data="btn_cancel_login")]
+                )
+
+        elif data == "btn_close_panel":
+            await event.delete()
+
         elif data == "btn_set_escrow_group":
             if not await is_owner(event.sender_id, db):
                 await event.reply("❌ **Access Denied**: Only the Middleman Owner can set escrow groups.")
@@ -340,7 +397,7 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
                 "The Middleman Owner will create or register the room once a deal is initiated."
             )
 
-    @client.on(events.NewMessage(pattern=r'^🫧 Terms of Service$'))
+    @client.on(events.NewMessage(pattern=r'^📜 Terms of Service$'))
     async def tos_button_handler(event: events.NewMessage.Event) -> None:
         settings = await db.get_settings()
         tos_text = settings.get("tos_text") or "Terms of Service not configured yet."
@@ -433,8 +490,30 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
             help_text = (
                 "ℹ️ **Spinify Escrow — Help**\n\n"
                 "• 🧊 **Join Group** — Get a link to today's active escrow room\n"
-                "• 🫧 **Terms of Service** — View the escrow terms\n"
+                "• 📜 **Terms of Service** — View the escrow terms\n"
                 "• 💎 **Escrow Wallets** — View accepted crypto addresses\n\n"
                 "For deal assistance, contact the Middleman Owner."
             )
         await event.respond(help_text)
+
+    @client.on(events.NewMessage(pattern=r'^👑 Manage Admins$'))
+    @owner_command(db)
+    async def manage_admins_button_handler(event: events.NewMessage.Event) -> None:
+        """Shows admin management panel from bottom keyboard."""
+        admins = await db.list_admins()
+        if admins:
+            lines = [f"• `{a['user_id']}` {('@' + a['username']) if a.get('username') else ''}".strip() for a in admins]
+            admin_list = "\n".join(lines)
+        else:
+            admin_list = "_No secondary admins added yet._"
+        from telethon import Button as Btn
+        await event.respond(
+            f"👑 **Admin Management**\n\n"
+            f"**Current Admins**:\n{admin_list}\n\n"
+            f"Choose an action:",
+            buttons=[
+                [Btn.inline("➕ Add Admin",    data="btn_add_admin")],
+                [Btn.inline("➖ Remove Admin", data="btn_remove_admin")],
+                [Btn.inline("❌ Close",        data="btn_close_panel")],
+            ]
+        )

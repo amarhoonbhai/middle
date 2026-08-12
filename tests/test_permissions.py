@@ -32,12 +32,13 @@ async def test_is_owner_db_override(temp_db: Database) -> None:
 
 @pytest.mark.asyncio
 async def test_is_owner_env_fallback() -> None:
-    # Create a mock database that returns empty settings or raises an error
+    # Create a mock database that returns empty settings and no admins
     mock_db = AsyncMock()
-    mock_db.get_settings.return_value = {} # No database owner_id configured
-    
+    mock_db.get_settings.return_value = {}  # No database owner_id configured
+    mock_db.is_admin.return_value = False   # No secondary admins
+
     # Should fall back to config.OWNER_ID from the env
     env_owner = config.OWNER_ID
-    
+
     assert await is_owner(env_owner, mock_db) is True
     assert await is_owner(env_owner + 1, mock_db) is False

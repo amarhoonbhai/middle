@@ -109,6 +109,15 @@ class Database:
                 )
             """)
             
+            # 5. admins table — extra owner-level accounts granted by the primary owner
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS admins (
+                    user_id    INTEGER PRIMARY KEY,
+                    username   TEXT,
+                    added_at   TEXT NOT NULL
+                )
+            """)
+
             conn.commit()
             conn.close()
 
@@ -127,6 +136,60 @@ class Database:
 
     async def seed_settings(self, default_owner_id: int) -> None:
         await asyncio.to_thread(self._seed_settings, default_owner_id)
+
+    # --- Admin (secondary owner) Methods ---
+
+    def _add_admin(self, user_id: int, username: Optional[str]) -> None:
+        utc_now = datetime.now(timezone.utc).isoformat()
+        with self.lock:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO admins (user_id, username, added_at)
+                VALUES (?, ?, ?)
+            """, (user_id, username, utc_now))
+            conn.commit()
+            conn.close()
+
+    async def add_admin(self, user_id: int, username: Optional[str] = None) -> None:
+        await asyncio.to_thread(self._add_admin, user_id, username)
+
+    def _remove_admin(self, user_id: int) -> bool:
+        with self.lock:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM admins WHERE user_id = ?", (user_id,))
+            changed = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return changed
+
+    async def remove_admin(self, user_id: int) -> bool:
+        return await asyncio.to_thread(self._remove_admin, user_id)
+
+    def _list_admins(self) -> List[Dict[str, Any]]:
+        with self.lock:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM admins ORDER BY added_at DESC")
+            rows = cursor.fetchall()
+            conn.close()
+            return [dict(r) for r in rows]
+
+    async def list_admins(self) -> List[Dict[str, Any]]:
+        return await asyncio.to_thread(self._list_admins)
+
+    def _is_admin(self, user_id: int) -> bool:
+        with self.lock:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1 FROM admins WHERE user_id = ?", (user_id,))
+            row = cursor.fetchone()
+            conn.close()
+            return row is not None
+
+    async def is_admin(self, user_id: int) -> bool:
+        return await asyncio.to_thread(self._is_admin, user_id)
 
     # --- Settings Methods ---
 

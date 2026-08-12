@@ -9,20 +9,22 @@ logger = logging.getLogger(__name__)
 
 async def is_owner(sender_id: int, db: Any) -> bool:
     """
-    Checks if the sender_id matches the configured or registered owner of this userbot.
-    Uses the SQLite database setting first, and falls back to the .env OWNER_ID.
+    Checks if the sender_id is the primary owner OR an admin granted access by the owner.
+    Order: DB primary owner_id → admins table → .env OWNER_ID fallback.
     """
     if not sender_id:
         return False
     try:
         settings = await db.get_settings()
         db_owner_id = settings.get("owner_id")
-        if db_owner_id is not None:
-            return sender_id == int(db_owner_id)
+        if db_owner_id is not None and sender_id == int(db_owner_id):
+            return True
+        # Check secondary admins table
+        if await db.is_admin(sender_id):
+            return True
     except Exception:
-        # Fall back to env-level configuration in case of database issues
         pass
-    
+
     return sender_id == config.OWNER_ID
 
 def owner_command(db: Any) -> Callable:
