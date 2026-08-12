@@ -68,6 +68,10 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
                 [
                     Button.inline("💎 Escrow Wallets", data="btn_crypto"),
                     Button.inline("📊 Escrow Stats", data="btn_stats")
+                ],
+                [
+                    Button.inline("🔌 Connect Userbot", data="btn_connect_userbot"),
+                    Button.inline("🏠 Set Escrow Group", data="btn_set_escrow_group")
                 ]
             ]
             
@@ -81,6 +85,10 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
                     KeyboardButtonRow(buttons=[
                         KeyboardButton(text="💎 Escrow Wallets"),
                         KeyboardButton(text="📊 Escrow Stats")
+                    ]),
+                    KeyboardButtonRow(buttons=[
+                        KeyboardButton(text="🔌 Connect Userbot"),
+                        KeyboardButton(text="🏠 Set Escrow Group")
                     ]),
                     KeyboardButtonRow(buttons=[
                         KeyboardButton(text="⚙️ Settings")
@@ -189,7 +197,28 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
             if not await is_owner(clicker_id, db):
                 await event.reply("❌ **Access Denied**: Only the Middleman Owner can close deals.")
             else:
-                await event.reply("⚠️ **Closing Deal**: Type `/close` or `/close confirm` in this chat to execute.")
+                await event.reply("⚠️ **Closing Deal**: Type `.close` or `.close confirm` in this chat to execute.")
+                
+        elif data == "btn_connect_userbot":
+            if not await is_owner(event.sender_id, db):
+                await event.reply("❌ **Access Denied**: Only the Middleman Owner can connect userbots.")
+            else:
+                await event.reply(
+                    "🔌 **Connect Owner Userbot Account**\n\n"
+                    "To connect your userbot account, please send `.addaccount <phone_number>` in this private chat.\n\n"
+                    "**Example**:\n"
+                    "`.addaccount +1234567890`"
+                )
+                
+        elif data == "btn_set_escrow_group":
+            if not await is_owner(event.sender_id, db):
+                await event.reply("❌ **Access Denied**: Only the Middleman Owner can set escrow groups.")
+            else:
+                await event.reply(
+                    "🏠 **Set Escrow Group Chat**\n\n"
+                    "To manually register any group chat as today's active daily room, navigate to that group and type:\n"
+                    "`.setgroup`"
+                )
 
     # --- Persistent Reply Keyboard Listeners ---
 
@@ -252,3 +281,22 @@ def register_help_handlers(client: TelegramClient, db, is_userbot: bool = False)
             f"• **Total Closed Deals**: `{total}`"
         )
         await event.respond(stats_info)
+
+    @client.on(events.NewMessage(pattern=r'^🔌 Connect Userbot$'))
+    @owner_command(db)
+    async def connect_userbot_button_handler(event: events.NewMessage.Event) -> None:
+        await event.respond(
+            "🔌 **Connect Owner Userbot Account**\n\n"
+            "To connect your userbot account, please send `.addaccount <phone_number>` in this private chat.\n\n"
+            "**Example**:\n"
+            "`.addaccount +1234567890`"
+        )
+
+    @client.on(events.NewMessage(pattern=r'^🏠 Set Escrow Group$'))
+    @owner_command(db)
+    async def set_escrow_group_button_handler(event: events.NewMessage.Event) -> None:
+        await event.respond(
+            "🏠 **Set Escrow Group Chat**\n\n"
+            "To manually register any group chat as today's active daily room, navigate to that group and type:\n"
+            "`.setgroup`"
+        )
