@@ -7,7 +7,7 @@ from userbot.services.permissions import owner_command, is_owner
 logger = logging.getLogger(__name__)
 
 def register_moderation_handlers(client: TelegramClient, db) -> None:
-    @client.on(events.NewMessage(pattern=r'^\.block$'))
+    @client.on(events.NewMessage(pattern=r'^[./]block$'))
     @owner_command(db)
     async def block_command(event: events.NewMessage.Event) -> None:
         if not event.is_reply:

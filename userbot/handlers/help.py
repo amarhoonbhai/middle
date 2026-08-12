@@ -2,7 +2,7 @@ from telethon import TelegramClient, events
 from userbot.services.permissions import owner_command
 
 def register_help_handlers(client: TelegramClient, db) -> None:
-    @client.on(events.NewMessage(pattern=r'^\.help'))
+    @client.on(events.NewMessage(pattern=r'^[./]help'))
     @owner_command(db)
     async def help_command(event: events.NewMessage.Event) -> None:
         help_text = (

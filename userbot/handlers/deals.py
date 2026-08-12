@@ -2,7 +2,7 @@ from telethon import TelegramClient, events
 from userbot.services.permissions import owner_command
 
 def register_deal_handlers(client: TelegramClient, db) -> None:
-    @client.on(events.NewMessage(pattern=r'^\.rec$'))
+    @client.on(events.NewMessage(pattern=r'^[./]rec$'))
     @owner_command(db)
     async def rec_command(event: events.NewMessage.Event) -> None:
         chat_id = event.chat_id
@@ -33,7 +33,7 @@ def register_deal_handlers(client: TelegramClient, db) -> None:
         )
         await event.respond(response)
 
-    @client.on(events.NewMessage(pattern=r'^\.tos$'))
+    @client.on(events.NewMessage(pattern=r'^[./]tos$'))
     @owner_command(db)
     async def tos_command(event: events.NewMessage.Event) -> None:
         deal = await db.get_deal(event.chat_id)
@@ -52,7 +52,7 @@ def register_deal_handlers(client: TelegramClient, db) -> None:
             
         await event.respond(f"{prefix}{tos_text}")
 
-    @client.on(events.NewMessage(pattern=r'^\.settos(?:\s+([\s\S]+))?$'))
+    @client.on(events.NewMessage(pattern=r'^[./]settos(?:\s+([\s\S]+))?$'))
     @owner_command(db)
     async def settos_command(event: events.NewMessage.Event) -> None:
         tos_text = None

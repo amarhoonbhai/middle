@@ -2,7 +2,7 @@ from telethon import TelegramClient, events
 from userbot.services.permissions import owner_command
 
 def register_settings_handlers(client: TelegramClient, db) -> None:
-    @client.on(events.NewMessage(pattern=r'^\.settings$'))
+    @client.on(events.NewMessage(pattern=r'^[./]settings$'))
     @owner_command(db)
     async def settings_command(event: events.NewMessage.Event) -> None:
         settings = await db.get_settings()

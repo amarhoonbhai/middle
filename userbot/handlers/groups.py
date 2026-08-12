@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 pending_closes: Dict[int, datetime] = {}
 
 def register_group_handlers(client: TelegramClient, db) -> None:
-    @client.on(events.NewMessage(pattern=r'^\.mm(?:\s+(.+))?$'))
+    @client.on(events.NewMessage(pattern=r'^[./]mm(?:\s+(.+))?$'))
     @owner_command(db)
     async def mm_command(event: events.NewMessage.Event) -> None:
         args = event.pattern_match.group(1)
@@ -253,7 +253,7 @@ def register_group_handlers(client: TelegramClient, db) -> None:
             
         await event.respond(response_text)
 
-    @client.on(events.NewMessage(pattern=r'^\.name(?:\s+(.+))?$'))
+    @client.on(events.NewMessage(pattern=r'^[./]name(?:\s+(.+))?$'))
     @owner_command(db)
     async def name_command(event: events.NewMessage.Event) -> None:
         chat_id = event.chat_id
@@ -281,7 +281,7 @@ def register_group_handlers(client: TelegramClient, db) -> None:
         
         await event.respond(f"✅ **Group renamed to**: {new_title}")
 
-    @client.on(events.NewMessage(pattern=r'^\.close(?:\s+(.+))?$'))
+    @client.on(events.NewMessage(pattern=r'^[./]close(?:\s+(.+))?$'))
     @owner_command(db)
     async def close_command(event: events.NewMessage.Event) -> None:
         chat_id = event.chat_id

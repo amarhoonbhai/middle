@@ -1,6 +1,5 @@
 import os
 import sys
-import glob
 import logging
 import argparse
 from telethon import TelegramClient
@@ -29,6 +28,8 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout)
     ]
 )
+logger = logging.getLogger("userbot.main")
+
 def get_telegram_client(session_name: str) -> TelegramClient:
     """Initializes TelegramClient with SOCKS5 Proxy if configured in the environment."""
     if config.PROXY_IP and config.PROXY_PORT:
@@ -39,199 +40,43 @@ def get_telegram_client(session_name: str) -> TelegramClient:
     else:
         return TelegramClient(session_name, config.API_ID, config.API_HASH)
 
-# --- Session Management Helpers ---
-
-ACTIVE_SESSION_FILE = "active_session.txt"
-
-def list_sessions() -> list[str]:
-    """Scans the current directory for Telethon session files and returns their names."""
-    session_files = glob.glob("*.session")
-    sessions = []
-    for f in session_files:
-        basename = os.path.basename(f)
-        if basename.endswith(".session"):
-            sessions.append(basename[:-8])  # strip '.session'
-    return sessions
-
-def get_active_session() -> str:
-    """Reads the current active session name, falling back to the env default."""
-    if os.path.exists(ACTIVE_SESSION_FILE):
-        try:
-            with open(ACTIVE_SESSION_FILE, "r", encoding="utf-8") as f:
-                name = f.read().strip()
-                if name:
-                    return name
-        except Exception:
-            pass
-    return config.SESSION_NAME
-
-def set_active_session(name: str) -> None:
-    """Saves the active session name persistently to file."""
-    try:
-        with open(ACTIVE_SESSION_FILE, "w", encoding="utf-8") as f:
-            f.write(name.strip())
-    except Exception as e:
-        logger.error(f"Failed to save active session name: {e}")
-
-async def manage_accounts_menu() -> None:
-    """Provides a sub-menu to select, add, and remove Telethon accounts."""
-    while True:
-        os.system("cls" if os.name == "nt" else "clear")
-        sessions = list_sessions()
-        active = get_active_session()
-        
-        # Ensure the default env session is shown if no files exist yet
-        if active not in sessions and active == config.SESSION_NAME:
-            sessions.append(active)
-            
-        print("\n=========================================")
-        print("          Account Manager Menu")
-        print("=========================================")
-        print(f"Current Active Account: {active}")
-        print("-" * 41)
-        print("Available Sessions:")
-        for idx, s in enumerate(sessions, 1):
-            marker = "⭐ (Active)" if s == active else ""
-            print(f" {idx}. {s} {marker}")
-        print("-" * 41)
-        print(" 1. Select Active Account")
-        print(" 2. Add New Account (Login)")
-        print(" 3. Remove/Delete Account")
-        print(" 4. Back to Main Menu")
-        print("=========================================")
-        
-        choice = input("\nSelect an option (1-4): ").strip()
-        
-        if choice == "1":
-            if not sessions:
-                print("No sessions available.")
-                input("\nPress Enter to return...")
-                continue
-            val = input("Enter the account number to make active: ").strip()
-            try:
-                idx = int(val)
-                if 1 <= idx <= len(sessions):
-                    set_active_session(sessions[idx-1])
-                    print(f"✅ Success: Active account set to '{sessions[idx-1]}'.")
-                else:
-                    print("Invalid selection.")
-            except ValueError:
-                print("Invalid input.")
-            input("\nPress Enter to return...")
-            
-        elif choice == "2":
-            name = input("\nEnter a name for the new account (e.g. main_acc): ").strip()
-            if not name:
-                print("Error: Name cannot be empty.")
-                input("\nPress Enter to return...")
-                continue
-            # Sanitize to valid filename characters
-            name = "".join(c for c in name if c.isalnum() or c in ("_", "-"))
-            if not name:
-                print("Error: Invalid name.")
-                input("\nPress Enter to return...")
-                continue
-                
-            print(f"\n⏳ Starting authorization flow for '{name}'...")
-            print("Follow the prompts in this terminal to authorize.")
-            print("-" * 40)
-            try:
-                client = get_telegram_client(name)
-                await client.start()
-                me = await client.get_me()
-                client.me_id = me.id
-                print(f"\n✅ Success! Logged in as: {me.first_name} (ID: {me.id})")
-                await client.disconnect()
-                set_active_session(name)
-            except Exception as e:
-                print(f"\n❌ Login Failed: {e}")
-            input("\nPress Enter to return...")
-            
-        elif choice == "3":
-            if not sessions:
-                print("No accounts to delete.")
-                input("\nPress Enter to return...")
-                continue
-            val = input("Enter the account number to delete: ").strip()
-            try:
-                idx = int(val)
-                if 1 <= idx <= len(sessions):
-                    target = sessions[idx-1]
-                    confirm = input(f"Are you sure you want to delete '{target}'? (y/N): ").strip().lower()
-                    if confirm == "y":
-                        session_file = f"{target}.session"
-                        journal_file = f"{target}.session-journal"
-                        deleted = False
-                        
-                        if os.path.exists(session_file):
-                            try:
-                                os.remove(session_file)
-                                deleted = True
-                            except Exception as fe:
-                                print(f"Error removing {session_file}: {fe}")
-                                
-                        if os.path.exists(journal_file):
-                            try:
-                                os.remove(journal_file)
-                            except Exception:
-                                pass
-                                
-                        if deleted:
-                            print(f"✅ Success: Account '{target}' files removed.")
-                            if target == get_active_session():
-                                set_active_session(config.SESSION_NAME)
-                        else:
-                            print("Error: Session file could not be deleted (it might be in use).")
-                else:
-                    print("Invalid selection.")
-            except ValueError:
-                print("Invalid input.")
-            input("\nPress Enter to return...")
-            
-        elif choice == "4":
-            break
-
-# --- Main Menus ---
-
 async def interactive_menu(db: Database) -> None:
     """Runs a terminal-based interactive administration menu."""
     while True:
         os.system("cls" if os.name == "nt" else "clear")
-        active_sess = get_active_session()
         
         print("\n=========================================")
-        print("Telegram Middleman Userbot Administration")
+        print("Telegram Middleman Bot Administration Menu")
         print("=========================================")
-        print(f" Active Session: {active_sess}")
+        print(f" Status: Token Configured")
         print("-" * 41)
-        print(" 1. Start Userbot Daemon")
+        print(" 1. Start Bot Daemon")
         print(" 2. View Settings & Stats")
         print(" 3. List Registered Deals")
         print(" 4. Configure Fee Percentage")
         print(" 5. Configure Minimum Fee")
         print(" 6. Configure Crypto Addresses (BTC/ETH/LTC)")
         print(" 7. Configure Terms of Service (TOS)")
-        print(" 8. Manage Accounts (Add/Remove/Select)")
-        print(" 9. Exit")
+        print(" 8. Exit")
         print("=========================================")
         
-        choice = input("\nSelect an option (1-9): ").strip()
+        choice = input("\nSelect an option (1-8): ").strip()
         
         if choice == "1":
-            print(f"\n⏳ Starting Telegram Userbot Daemon (Session: {active_sess})...")
+            print(f"\n⏳ Starting Telegram Bot Daemon...")
             print("Keep this terminal open while the bot runs.")
             print("To stop the bot, press Ctrl+C.")
             print("-" * 40)
             
-            client = get_telegram_client(active_sess)
+            client = get_telegram_client("bot_session")
             register_all_handlers(client, db)
             
-            await client.start()
+            await client.start(bot_token=config.BOT_TOKEN)
             
             me = await client.get_me()
-            client.me_id = me.id  # Cache user ID directly on the client
-            await db.update_settings(owner_id=me.id)
-            print(f"✅ Userbot is active. Logged in as: {me.first_name} (ID: {me.id})")
+            client.me_id = me.id  # Cache bot ID directly on the client
+            await db.update_settings(owner_id=config.OWNER_ID)
+            print(f"✅ Bot is active. Logged in as: {me.first_name} (@{me.username})")
             print("Listening for commands on Telegram...")
             
             await client.run_until_disconnected()
@@ -349,13 +194,10 @@ async def interactive_menu(db: Database) -> None:
             input("\nPress Enter to return to menu...")
             
         elif choice == "8":
-            await manage_accounts_menu()
-            
-        elif choice == "9":
             print("\nExiting. Goodbye!")
             sys.exit(0)
         else:
-            print("\nInvalid choice. Choose between 1 and 9.")
+            print("\nInvalid choice. Choose between 1 and 8.")
             input("\nPress Enter to return to menu...")
 
 async def run_cli() -> None:
@@ -368,12 +210,12 @@ async def run_cli() -> None:
         return
         
     parser = argparse.ArgumentParser(
-        description="Telegram Middleman Userbot - Command Line Interface",
+        description="Telegram Middleman Bot - Command Line Interface",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     subparsers = parser.add_subparsers(dest="command", help="CLI commands")
     
-    subparsers.add_parser("start", help="Start the Telegram userbot daemon")
+    subparsers.add_parser("start", help="Start the Telegram bot daemon")
     subparsers.add_parser("settings", help="Show configurations and statistics")
     subparsers.add_parser("stats", help="Show transaction statistics")
     subparsers.add_parser("list-deals", help="List all registered deals")
@@ -397,21 +239,20 @@ async def run_cli() -> None:
     settos_parser.add_argument("text", type=str)
     
     args = parser.parse_args()
-    active_sess = get_active_session()
     
     if args.command == "start":
         logger.info("Initializing SQLite database...")
-        logger.info(f"Initializing Telegram client (Session: {active_sess})...")
-        client = get_telegram_client(active_sess)
+        logger.info("Initializing Telegram client (Session: bot_session)...")
+        client = get_telegram_client("bot_session")
         register_all_handlers(client, db)
         
         logger.info("Starting Telegram Client login flow...")
-        await client.start()
+        await client.start(bot_token=config.BOT_TOKEN)
         
         me = await client.get_me()
         client.me_id = me.id
-        await db.update_settings(owner_id=me.id)
-        logger.info(f"✅ Userbot successfully authorized! Logged in as: {me.first_name} (ID: {me.id})")
+        await db.update_settings(owner_id=config.OWNER_ID)
+        logger.info(f"✅ Bot successfully authorized! Logged in as: {me.first_name} (@{me.username})")
         logger.info("Running daemon... Press Ctrl+C to stop.")
         
         await client.run_until_disconnected()
@@ -477,6 +318,6 @@ if __name__ == "__main__":
         import asyncio
         asyncio.run(run_cli())
     except KeyboardInterrupt:
-        logger.info("Userbot stopped by user (Ctrl+C).")
+        logger.info("Bot stopped by user (Ctrl+C).")
     except Exception as e:
-        logger.critical(f"Unhandled userbot crash: {e}", exc_info=True)
+        logger.critical(f"Unhandled bot crash: {e}", exc_info=True)

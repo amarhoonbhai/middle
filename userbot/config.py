@@ -10,7 +10,7 @@ class Config:
     def __init__(self) -> None:
         self.API_ID: int = self._get_required_int("API_ID")
         self.API_HASH: str = self._get_required_str("API_HASH")
-        self.SESSION_NAME: str = os.getenv("SESSION_NAME", "userbot_session")
+        self.BOT_TOKEN: str = self._get_required_str("BOT_TOKEN")
         self.OWNER_ID = None
         owner_id_str = os.getenv("OWNER_ID")
         if owner_id_str and owner_id_str.strip():

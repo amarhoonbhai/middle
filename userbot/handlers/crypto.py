@@ -7,7 +7,7 @@ from userbot.utils.helpers import (
 )
 
 def register_crypto_handlers(client: TelegramClient, db) -> None:
-    @client.on(events.NewMessage(pattern=r'^\.btc$'))
+    @client.on(events.NewMessage(pattern=r'^[./]btc$'))
     @owner_command(db)
     async def btc_command(event: events.NewMessage.Event) -> None:
         settings = await db.get_settings()
@@ -17,7 +17,7 @@ def register_crypto_handlers(client: TelegramClient, db) -> None:
             return
         await event.respond(f"**BTC Address**\n\n`{addr}`\n\nNetwork: Bitcoin")
 
-    @client.on(events.NewMessage(pattern=r'^\.eth$'))
+    @client.on(events.NewMessage(pattern=r'^[./]eth$'))
     @owner_command(db)
     async def eth_command(event: events.NewMessage.Event) -> None:
         settings = await db.get_settings()
@@ -27,7 +27,7 @@ def register_crypto_handlers(client: TelegramClient, db) -> None:
             return
         await event.respond(f"**ETH Address**\n\n`{addr}`\n\nNetwork: Ethereum (ERC-20)")
 
-    @client.on(events.NewMessage(pattern=r'^\.ltc$'))
+    @client.on(events.NewMessage(pattern=r'^[./]ltc$'))
     @owner_command(db)
     async def ltc_command(event: events.NewMessage.Event) -> None:
         settings = await db.get_settings()
@@ -37,7 +37,7 @@ def register_crypto_handlers(client: TelegramClient, db) -> None:
             return
         await event.respond(f"**LTC Address**\n\n`{addr}`\n\nNetwork: Litecoin")
 
-    @client.on(events.NewMessage(pattern=r'^\.setbtc(?:\s+(.+))?$'))
+    @client.on(events.NewMessage(pattern=r'^[./]setbtc(?:\s+(.+))?$'))
     @owner_command(db)
     async def setbtc_command(event: events.NewMessage.Event) -> None:
         addr = event.pattern_match.group(1)
@@ -51,7 +51,7 @@ def register_crypto_handlers(client: TelegramClient, db) -> None:
         await db.update_settings(btc_address=addr)
         await event.respond(f"✅ **Success**: BTC address updated to:\n`{addr}`")
 
-    @client.on(events.NewMessage(pattern=r'^\.seteth(?:\s+(.+))?$'))
+    @client.on(events.NewMessage(pattern=r'^[./]seteth(?:\s+(.+))?$'))
     @owner_command(db)
     async def seteth_command(event: events.NewMessage.Event) -> None:
         addr = event.pattern_match.group(1)
@@ -65,7 +65,7 @@ def register_crypto_handlers(client: TelegramClient, db) -> None:
         await db.update_settings(eth_address=addr)
         await event.respond(f"✅ **Success**: ETH address updated to:\n`{addr}`")
 
-    @client.on(events.NewMessage(pattern=r'^\.setltc(?:\s+(.+))?$'))
+    @client.on(events.NewMessage(pattern=r'^[./]setltc(?:\s+(.+))?$'))
     @owner_command(db)
     async def setltc_command(event: events.NewMessage.Event) -> None:
         addr = event.pattern_match.group(1)
