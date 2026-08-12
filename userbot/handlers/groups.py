@@ -22,13 +22,16 @@ def register_group_handlers(client: TelegramClient, db) -> None:
         if not args:
             if not event.is_group:
                 await event.respond(
-                    "❌ **Usage**: `.mm <user1> <user2>`\n"
-                    "(Run inside a group chat to activate it for a deal, or specify participants in private chat to create a new group)"
-                )
-                return
-                
-            chat_id = event.chat_id
-            
+        from telethon.tl import types
+        from telethon.errors import UserPrivacyRestrictedError, RPCError
+        
+        chat_id = event.chat_id
+        is_group = event.is_group
+        
+        settings = await db.get_settings()
+        
+        # 1. Existing Group Activation Pathway
+        if is_group:
             # Check if there is already an active deal in this group
             existing_deal = await db.get_deal(chat_id)
             if existing_deal:
@@ -36,34 +39,111 @@ def register_group_handlers(client: TelegramClient, db) -> None:
                 await event.respond(f"⚠️ **Notice**: This group is already registered for active **Deal #{formatted_deal_id}**.")
                 return
                 
-            # Iterate group participants to register them in the deal metadata
+            # Parse participants list
             participants = []
-            try:
-                async for user in client.iter_participants(chat_id):
-                    # Exclude bots and the owner themselves
-                    if not user.bot and user.id != config.OWNER_ID:
-                        username = getattr(user, "username", None)
-                        participants.append(f"@{username}" if username else str(user.id))
-            except Exception as e:
-                logger.warning(f"Could not iterate participants in chat {chat_id}: {e}")
-                
-            if not participants:
-                participants = ["Group Members"]
-                
+            if args:
+                parts = args.split()
+                if len(parts) != 2:
+                    await event.respond("❌ **Usage**: `.mm <user1> <user2>` (Must provide exactly two participants)")
+                    return
+                participants = parts
+            else:
+                # No arguments: iterate current group members
+                try:
+                    async for user in client.iter_participants(chat_id):
+                        if not user.bot and user.id != config.OWNER_ID:
+                            username = getattr(user, "username", None)
+                            participants.append(f"@{username}" if username else str(user.id))
+                except Exception as e:
+                    logger.warning(f"Could not iterate participants in chat {chat_id}: {e}")
+                    
+                if not participants:
+                    participants = ["Group Members"]
+            
             # Create deal in SQLite bound to the current group
             deal_id = await db.create_deal(chat_id, participants)
             formatted_deal_id = f"{deal_id:04d}"
             
-            settings = await db.get_settings()
+            naming_template = settings.get("group_naming_template", "MM • Deal #{deal_id}")
+            title = naming_template.replace("{deal_id}", formatted_deal_id)
+            status_msg = await event.respond(f"⏳ Activating **Deal #{formatted_deal_id}** in this group...")
+            
+            added = []
+            failed = []
+            
+            # If arguments are provided, resolve and try to invite them into this group
+            if args:
+                from telethon.tl.functions.messages import AddChatUserRequest
+                from telethon.tl.functions.channels import InviteToChannelRequest
+                from telethon.errors import UserAlreadyParticipantError
+                from userbot.services.group_service import call_with_retry
+                
+                chat_peer = await client.get_input_entity(chat_id)
+                
+                for p in participants:
+                    try:
+                        user_ent = await group_service.resolve_user_entity(client, p)
+                        try:
+                            if isinstance(chat_peer, types.InputPeerChat):
+                                await call_with_retry(client, AddChatUserRequest(chat_id=chat_peer.chat_id, user_id=user_ent, fwd_limit=0))
+                            else:
+                                await call_with_retry(client, InviteToChannelRequest(channel=chat_peer, users=[user_ent]))
+                            
+                            identifier = getattr(user_ent, "username", None) or str(user_ent.id)
+                            added.append(f"@{identifier}" if getattr(user_ent, "username", None) else identifier)
+                        except UserAlreadyParticipantError:
+                            identifier = getattr(user_ent, "username", None) or str(user_ent.id)
+                            added.append(f"@{identifier}" if getattr(user_ent, "username", None) else identifier)
+                        except (UserPrivacyRestrictedError, RPCError) as ae:
+                            logger.warning(f"Failed to add {p} directly: {ae}")
+                            failed.append(p)
+                    except Exception as e:
+                        logger.error(f"Failed to resolve/add participant {p}: {e}")
+                        failed.append(p)
+            else:
+                # No arguments: they are already in the group
+                added = list(participants)
+                
+            # Export group invite link
+            chat_entity = await client.get_entity(chat_id)
+            invite_link = await group_service.get_invite_link(client, chat_entity)
+            
+            # Attempt to DM invite link to failed users
+            failed_notified = []
+            failed_unnotified = []
+            
+            if failed and invite_link:
+                for p_id in failed:
+                    try:
+                        await client.send_message(
+                            p_id,
+                            f"🤝 **Hello! You have been invited to join Deal #{formatted_deal_id}** in group chat.\n\n"
+                            f"Since your privacy settings prevented adding you automatically, "
+                            f"please click the link below to join the group:\n{invite_link}"
+                        )
+                        failed_notified.append(p_id)
+                    except Exception as dme:
+                        logger.warning(f"Could not send DM invite link to {p_id}: {dme}")
+                        failed_unnotified.append(p_id)
+            else:
+                failed_unnotified = list(failed)
+                
             welcome_text = (
                 f"🤝 **Deal #{formatted_deal_id} activated in this group.**\n\n"
                 "Please read the Terms of Service before proceeding.\n"
                 "Both parties should confirm the agreed amount and transaction terms before payment.\n\n"
-                f"• **Participants**: {', '.join(participants)}"
+                f"• **Participants Added**: {', '.join(added) if added else 'None'}\n"
             )
-            await event.respond(welcome_text)
+            if failed_notified:
+                welcome_text += f"✉️ **Invite Link Sent via DM to**: {', '.join(failed_notified)} (due to group invite privacy settings)\n"
+            if failed_unnotified:
+                welcome_text += f"⚠️ **Failed to add/DM**: {', '.join(failed_unnotified)}\n"
+                if invite_link:
+                    welcome_text += f"🔗 **Manual Invite Link**: {invite_link}\n"
             
-            # Send and pin TOS
+            await client.send_message(chat_id, welcome_text)
+            
+            # Pin TOS
             tos_text = settings.get("tos_text")
             if tos_text:
                 tos_msg = await client.send_message(
@@ -74,6 +154,16 @@ def register_group_handlers(client: TelegramClient, db) -> None:
                     await client.pin_message(chat_id, tos_msg.id, notify=True)
                 except Exception as pe:
                     logger.warning(f"Could not pin TOS message in group {chat_id}: {pe}")
+            
+            await status_msg.delete()
+            return
+
+        # 2. New Group Creation Pathway (In DMs/Private Chat)
+        if not args:
+            await event.respond(
+                "❌ **Usage**: `.mm <user1> <user2>`\n"
+                "(Specify participants in private chat to create a new group, or run `.mm` inside a group chat to activate it)"
+            )
             return
             
         parts = args.split()
@@ -81,13 +171,8 @@ def register_group_handlers(client: TelegramClient, db) -> None:
             await event.respond("❌ **Usage**: `.mm <user1> <user2>` (Must provide exactly two participants)")
             return
             
-        # 1. Insert a placeholder in the database to acquire the sequential deal_id
-        placeholder_chat_id = None
+        # Insert placeholder to get sequential deal_id
         try:
-            # We insert with a temporary negative chat ID to bypass UNIQUE constraints during setup, 
-            # or NULL if unique constraints are not triggered.
-            # In SQLite, NULL doesn't trigger UNIQUE constraints, but to be safe and clean, 
-            # we create the deal record, retrieve the deal_id, and then update it once the group is created.
             deal_id = await db.create_deal(0, parts)  # Temporary chat_id = 0
         except Exception as e:
             logger.error(f"Failed to initialize deal in database: {e}")
@@ -95,20 +180,15 @@ def register_group_handlers(client: TelegramClient, db) -> None:
             return
             
         formatted_deal_id = f"{deal_id:04d}"
-        
-        # 2. Get settings for group title template and TOS
-        settings = await db.get_settings()
         naming_template = settings.get("group_naming_template", "MM • Deal #{deal_id}")
         title = naming_template.replace("{deal_id}", formatted_deal_id)
         
         status_msg = await event.respond(f"⏳ Creating group **{title}**...")
         
-        # 3. Create the group
         try:
             chat_entity, added, failed = await group_service.create_mm_group(client, title, parts)
         except Exception as e:
-            # Clean up the placeholder if group creation completely failed
-            # We'll use database queries to delete the placeholder so we don't pollute deal IDs
+            # Clean up placeholder
             def _delete_deal(d_id: int):
                 with db.lock:
                     conn = db._get_conn()
@@ -123,8 +203,6 @@ def register_group_handlers(client: TelegramClient, db) -> None:
             await status_msg.edit(f"❌ **Failed to create group**: {str(e)}")
             return
             
-        # 4. Success! Update the deal with the real chat ID and participants list
-        # Chat IDs returned by Telethon can be signed. Let's get the signed peer ID
         from telethon import utils
         signed_chat_id = utils.get_peer_id(chat_entity)
         
@@ -133,7 +211,7 @@ def register_group_handlers(client: TelegramClient, db) -> None:
         # Export group invite link
         invite_link = await group_service.get_invite_link(client, chat_entity)
         
-        # Attempt to send private message (DM) with invite link to failed participants
+        # Attempt to DM invite link to failed users
         failed_notified = []
         failed_unnotified = []
         
@@ -168,7 +246,7 @@ def register_group_handlers(client: TelegramClient, db) -> None:
             
         await client.send_message(signed_chat_id, welcome_text)
         
-        # Send and pin TOS if configured
+        # Pin TOS
         tos_text = settings.get("tos_text")
         if tos_text:
             tos_msg = await client.send_message(
@@ -180,7 +258,8 @@ def register_group_handlers(client: TelegramClient, db) -> None:
             except Exception as pe:
                 logger.warning(f"Could not pin TOS message in group {signed_chat_id}: {pe}")
                 
-        await status_msg.edit(f"✅ **Deal #{formatted_deal_id} group created successfully!**\nGroup Title: {title}")
+        await status_msg.delete()
+        await event.respond(f"✅ **Deal #{formatted_deal_id} group created successfully!**\nGroup Title: {title}")
 
     @client.on(events.NewMessage(pattern=r'^\.name(?:\s+(.+))?$'))
     @owner_command(db)
